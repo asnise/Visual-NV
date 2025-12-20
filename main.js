@@ -52,6 +52,8 @@ let editorState = {
   startY: 0,
 };
 
+const OVERLAY_BASE_SIZE = 60;
+
 function getChapter() {
   return (
     project.chapters.find((c) => c.id === activeChapterId) ||
@@ -386,10 +388,11 @@ function renderStage() {
     if (face?.url) {
       const faceEl = document.createElement("div");
       faceEl.className = "char-layer-face";
+      const size = OVERLAY_BASE_SIZE * (face.scale || 1);
       faceEl.style.left = `${face.x}%`;
       faceEl.style.top = `${face.y}%`;
-      faceEl.style.width = `${60 * (face.scale || 1)}px`;
-      faceEl.style.height = `${60 * (face.scale || 1)}px`;
+      faceEl.style.width = `${size}px`;
+      faceEl.style.height = `${size}px`;
       faceEl.style.backgroundImage = `url('${face.url}')`;
       faceEl.style.zIndex = "2";
       wrapper.appendChild(faceEl);
@@ -590,6 +593,8 @@ function renderPreviewFrame() {
 
     if (slot.anim && slot.anim !== "none") {
       let animClass = "preview-char-enter-fade";
+      if (slot.anim === "slide_left") animClass = "preview-char-enter-left";
+      if (slot.anim === "slide_right") animClass = "preview-char-enter-right";
       visual.classList.add(animClass);
     }
 
@@ -605,10 +610,11 @@ function renderPreviewFrame() {
     if (face?.url) {
       const faceEl = document.createElement("div");
       faceEl.className = "p-char-face";
+      const size = OVERLAY_BASE_SIZE * (face.scale || 1);
       faceEl.style.left = `${face.x}%`;
       faceEl.style.top = `${face.y}%`;
-      faceEl.style.width = `${60 * (face.scale || 1)}px`;
-      faceEl.style.height = `${60 * (face.scale || 1)}px`;
+      faceEl.style.width = `${size}px`;
+      faceEl.style.height = `${size}px`;
       faceEl.style.backgroundImage = `url('${face.url}')`;
       faceEl.style.zIndex = "2";
       visual.appendChild(faceEl);
@@ -672,9 +678,9 @@ function initOverlayEditorEvents() {
     if (isResizing) {
       let newWidth = startWidth + dx;
       if (newWidth < 10) return;
-      const scale = newWidth / 60;
-      wrapper.style.width = 60 * scale + "px";
-      wrapper.style.height = 60 * scale + "px";
+      const scale = newWidth / OVERLAY_BASE_SIZE;
+      wrapper.style.width = OVERLAY_BASE_SIZE * scale + "px";
+      wrapper.style.height = OVERLAY_BASE_SIZE * scale + "px";
       document.getElementById("propScale").value = scale.toFixed(2);
     } else if (isDragging) {
       const baseImg = document.getElementById("overlayBaseImg");
@@ -788,12 +794,17 @@ function openOverlayEditor(idx) {
   const face = char.faces[idx];
 
   const sidebar = document.querySelector(".overlay-props-panel");
+  const propsContent = sidebar.children[1];
+
   let bodySelect = document.getElementById("refBodySelect");
   if (!bodySelect) {
     const group = document.createElement("div");
-    group.className = "panel-section";
+    group.className = "form-group";
+    group.style.borderBottom = "1px solid #eee";
+    group.style.paddingBottom = "15px";
+    group.style.marginBottom = "15px";
     group.innerHTML = `<label>Reference Body</label><select id="refBodySelect" onchange="changeEditorRefBody(this.value)"></select>`;
-    sidebar.prepend(group);
+    propsContent.insertBefore(group, propsContent.firstChild);
     bodySelect = document.getElementById("refBodySelect");
   }
   bodySelect.innerHTML = char.bodies
@@ -808,7 +819,7 @@ function openOverlayEditor(idx) {
   const wrapper = document.getElementById("overlayTargetWrapper");
   wrapper.style.left = face.x + "%";
   wrapper.style.top = face.y + "%";
-  const size = 60 * (face.scale || 1);
+  const size = OVERLAY_BASE_SIZE * (face.scale || 1);
   wrapper.style.width = size + "px";
   wrapper.style.height = size + "px";
   document.getElementById("propX").value = face.x;
@@ -834,8 +845,8 @@ function updateOverlayFromProps() {
   const s = parseFloat(document.getElementById("propScale").value) || 1;
   wrapper.style.left = x + "%";
   wrapper.style.top = y + "%";
-  wrapper.style.width = 60 * s + "px";
-  wrapper.style.height = 60 * s + "px";
+  wrapper.style.width = OVERLAY_BASE_SIZE * s + "px";
+  wrapper.style.height = OVERLAY_BASE_SIZE * s + "px";
 }
 
 function saveOverlayPosition() {
@@ -980,7 +991,6 @@ function importJSON(e) {
         activeChapterId = project.chapters[0].id;
         loadChapter(activeChapterId);
         renderCastPalette();
-        alert("Imported successfully!");
       } else alert("Invalid format");
     } catch {
       alert("Parse error");
@@ -1044,35 +1054,60 @@ function renderCharModal() {
         <div class="img-preview-mini" style="${f.url ? `background-image:url('${f.url}')` : ""}"></div>
         <input type="text" value="${f.name}" onchange="updateCharLayer('faces',${i},'name',this.value)" placeholder="Expression Name">
         <label class="upload-btn">Upload<input type="file" onchange="uploadLayerImage('faces',${i},this)" hidden accept="image/*"></label>
-        <button class="primary-btn" onclick="openOverlayEditor(${i})" style="font-size:12px;padding:4px 8px;">Graphic Editor</button>
+        <button class="primary-btn" onclick="openOverlayEditor(${i})" ">Graphic Editor</button>
         <button class="danger" onclick="removeCharLayer('faces',${i})" title="Remove">×</button>
       </div>`,
     )
     .join("");
 
   editPane.innerHTML = `
-    <div style="padding:15px;background:#fff;border-bottom:1px solid #eee;">
+    <div style="padding:15px;background:#fff;">
       <label style="font-size:12px;color:#666;text-transform:uppercase;letter-spacing:0.5px;display:block;margin-bottom:4px;">Character Name</label>
       <input type="text" value="${char.name}" onchange="updateCharPropEditor('name',this.value)" style="font-size:18px;font-weight:600;width:100%;padding:8px;border:1px solid #ddd;border-radius:4px;">
     </div>
 
+    <div class="chrome-tabs">
+      <div class="chrome-tab active" onclick="showLayerTab('bodies')">Body Sprites (Base)</div>
+      <div class="chrome-tab" onclick="showLayerTab('faces')">Expressions (Overlays)</div>
+    </div>
+
     <div class="edit-scroll-area" style="padding:15px; overflow-y:auto; flex:1;">
-        <div class="section-header" style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
-            <h4 style="margin:0;font-size:14px;color:#333;">Body Sprites (Base)</h4>
-            <button class="text-btn" onclick="addCharLayer('bodies')">+ Add Body</button>
-        </div>
-        <div class="layers-list" style="margin-bottom:20px;">
-            ${bodiesHtml}
+        <div id="tab-bodies-content" style="display:block;">
+            <div class="section-header" style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
+                <h4 style="margin:0;font-size:14px;color:#333;">Body Sprites (Base)</h4>
+                <button class="text-btn" onclick="addCharLayer('bodies')">+ Add Body</button>
+            </div>
+            <div class="layers-list" style="margin-bottom:20px;">
+                ${bodiesHtml}
+            </div>
         </div>
 
-        <div class="section-header" style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;border-top:1px solid #eee;padding-top:20px;">
-            <h4 style="margin:0;font-size:14px;color:#333;">Expressions (Overlays)</h4>
-            <button class="text-btn" onclick="addCharLayer('faces')">+ Add Expression</button>
-        </div>
-        <div class="layers-list">
-            ${facesHtml}
+        <div id="tab-faces-content" style="display:none;">
+            <div class="section-header" style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
+                <h4 style="margin:0;font-size:14px;color:#333;">Expressions (Overlays)</h4>
+                <button class="text-btn" onclick="addCharLayer('faces')">+ Add Expression</button>
+            </div>
+            <div class="layers-list">
+                ${facesHtml}
+            </div>
         </div>
     </div>`;
+}
+
+function showLayerTab(tabName) {
+  document
+    .querySelectorAll(".chrome-tab")
+    .forEach((tab) => tab.classList.remove("active"));
+  document.getElementById("tab-bodies-content").style.display = "none";
+  document.getElementById("tab-faces-content").style.display = "none";
+
+  if (tabName === "bodies") {
+    document.querySelector(".chrome-tab:nth-child(1)").classList.add("active");
+    document.getElementById("tab-bodies-content").style.display = "block";
+  } else {
+    document.querySelector(".chrome-tab:nth-child(2)").classList.add("active");
+    document.getElementById("tab-faces-content").style.display = "block";
+  }
 }
 
 function updateCharPropEditor(key, val) {
