@@ -1,0 +1,510 @@
+<!doctype html>
+<html lang="en">
+    <head>
+        <meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <title>Visual VN Editor</title>
+        <link rel="stylesheet" href="style.css" />
+    </head>
+    <body>
+        <header>
+            <nav class="menu-bar">
+                <div class="menu-item">
+                    File
+                    <div class="dropdown-content">
+                        <button
+                            onclick="
+                                document.getElementById('importInput').click()
+                            "
+                        >
+                            Import Project...
+                        </button>
+                        <button onclick="exportJSON()">Export Project</button>
+                        <button onclick="saveJSON()">Save Project</button>
+                        <input
+                            type="file"
+                            id="importInput"
+                            style="display: none"
+                            accept=".json"
+                            onchange="importJSON(event)"
+                        />
+                    </div>
+                </div>
+
+                <div class="menu-item">
+                    Edit
+                    <div class="dropdown-content">
+                        <button onclick="addFrame()">Add New Frame</button>
+                        <button onclick="deleteFrame()">Delete Frame</button>
+                        <hr />
+                        <button onclick="addCharacter()">
+                            Quick Add Character
+                        </button>
+                    </div>
+                </div>
+
+                <div class="menu-item">
+                    Option
+                    <div class="dropdown-content">
+                        <button onclick="openModal('chapterModal')">
+                            Chapter Manager
+                        </button>
+                        <button onclick="openModal('assetsModal')">
+                            Background Assets
+                        </button>
+                    </div>
+                </div>
+
+                <div class="menu-item">
+                    Component
+                    <div class="dropdown-content">
+                        <button onclick="openModal('characterModal')">
+                            Cast & Layers
+                        </button>
+                    </div>
+                </div>
+
+                <div class="menu-item">
+                    Window
+                    <div class="dropdown-content">
+                        <button onclick="openPreview()">Preview Player</button>
+                    </div>
+                </div>
+
+                <div class="menu-item">
+                    Help
+                    <div class="dropdown-content">
+                        <button onclick="alert('Visual VN Editor v1.4')">
+                            About
+                        </button>
+                    </div>
+                </div>
+            </nav>
+
+            <div class="actions">
+                <button class="primary-btn" onclick="openPreview()">
+                    <span style="margin-right: 5px">▶</span> Play Preview
+                </button>
+            </div>
+        </header>
+
+        <div class="workspace">
+            <div class="sidebar">
+                <div class="panel-header">
+                    <span>Cast Palette</span>
+                    <small>Drag to stage</small>
+                </div>
+                <div id="castList" class="cast-grid"></div>
+                <div style="padding: 10px; text-align: center">
+                    <button class="text-btn" onclick="addCharacter()">
+                        + New Character
+                    </button>
+                </div>
+            </div>
+
+            <div class="stage-area">
+                <div class="stage-wrapper">
+                    <div id="visualStage" class="visual-stage">
+                        <div
+                            class="slot-zone"
+                            data-slot="0"
+                            ondrop="drop(event)"
+                            ondragover="allowDrop(event)"
+                        ></div>
+                        <div
+                            class="slot-zone"
+                            data-slot="1"
+                            ondrop="drop(event)"
+                            ondragover="allowDrop(event)"
+                        ></div>
+                        <div
+                            class="slot-zone"
+                            data-slot="2"
+                            ondrop="drop(event)"
+                            ondragover="allowDrop(event)"
+                        ></div>
+                        <div
+                            class="slot-zone"
+                            data-slot="3"
+                            ondrop="drop(event)"
+                            ondragover="allowDrop(event)"
+                        ></div>
+
+                        <div
+                            class="stage-dialogue-box"
+                            id="dialogueBox"
+                            onclick="selectSlot(-1)"
+                        >
+                            <div class="d-speaker" id="overlaySpeaker">
+                                Speaker
+                            </div>
+                            <div class="d-text" id="overlayText">
+                                Dialogue text...
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="filmstrip-panel">
+                    <div id="filmstrip" class="filmstrip-reel"></div>
+                </div>
+            </div>
+
+            <div class="inspector">
+                <div class="panel-header">Properties</div>
+                <div id="inspectorContent" class="inspector-content"></div>
+            </div>
+        </div>
+
+        <div id="characterModal" class="modal-overlay">
+            <div class="modal-box large-modal">
+                <div class="modal-header">
+                    <h3>Character Setup & Layers</h3>
+                    <button
+                        class="close-btn"
+                        onclick="closeModal('characterModal')"
+                    >
+                        &times;
+                    </button>
+                </div>
+                <div class="modal-body">
+                    <div class="char-editor-layout">
+                        <div class="char-list-pane" id="charListPane"></div>
+                        <div class="char-edit-pane" id="charEditPane"></div>
+                    </div>
+                    <div style="padding: 20px; text-align: center">
+                        <button
+                            class="primary-btn"
+                            onclick="
+                                addCharacter();
+                                closeModal('characterModal');
+                            "
+                        >
+                            + Add New Character
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div id="chapterModal" class="modal-overlay">
+            <div class="modal-box">
+                <div class="modal-header">
+                    <h3>Manage Chapters</h3>
+                    <button
+                        class="close-btn"
+                        onclick="closeModal('chapterModal')"
+                    >
+                        &times;
+                    </button>
+                </div>
+                <div class="modal-body" id="chapterMgmtList"></div>
+                <div class="modal-footer">
+                    <button class="primary-btn" onclick="addChapter()">
+                        + New Chapter
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <div id="assetsModal" class="modal-overlay">
+            <div class="modal-box">
+                <div class="modal-header">
+                    <h3>Background Assets</h3>
+                    <button
+                        class="close-btn"
+                        onclick="closeModal('assetsModal')"
+                    >
+                        &times;
+                    </button>
+                </div>
+                <div class="modal-body">
+                    <button
+                        class="primary-btn"
+                        onclick="document.getElementById('bgFileInput').click()"
+                    >
+                        Upload New Background
+                    </button>
+                    <input
+                        type="file"
+                        id="bgFileInput"
+                        style="display: none"
+                        accept="image/*"
+                    />
+                    <div
+                        id="assetList"
+                        style="
+                            display: flex;
+                            flex-direction: column;
+                            gap: 10px;
+                            margin-top: 15px;
+                        "
+                    ></div>
+                </div>
+            </div>
+        </div>
+
+        <div id="previewModal" class="modal-overlay">
+            <div class="modal-box large-modal">
+                <div class="modal-header">
+                    <h3>Preview</h3>
+                    <div style="display: flex; gap: 10px; align-items: center">
+                        <label style="font-size: 12px">Ratio:</label>
+                        <select
+                            id="previewRatio"
+                            onchange="updatePreviewRatio()"
+                        >
+                            <option value="16:9">16:9 (Widescreen)</option>
+                            <option value="4:3">4:3 (Classic)</option>
+                            <option value="1:1">1:1 (Square)</option>
+                            <option value="custom">Custom</option>
+                        </select>
+                        <input
+                            type="text"
+                            id="customRatio"
+                            placeholder="e.g. 900:600"
+                            style="width: 100px; display: none"
+                            oninput="applyCustomRatio()"
+                        />
+                    </div>
+                    <button
+                        class="close-btn"
+                        onclick="closeModal('previewModal')"
+                    >
+                        &times;
+                    </button>
+                </div>
+                <div class="preview-viewport" id="pViewport">
+                    <div class="p-slot" id="pSlot0"></div>
+                    <div class="p-slot" id="pSlot1"></div>
+                    <div class="p-slot" id="pSlot2"></div>
+                    <div class="p-slot" id="pSlot3"></div>
+
+                    <div class="p-dialogue-layer">
+                        <div class="p-namebox" id="pSpeaker"></div>
+                        <div class="p-textbox" id="pText"></div>
+                    </div>
+
+                    <div class="p-controls">
+                        <button class="primary-btn" onclick="nextPreview()">
+                            Next ❯
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div id="overlayModal" class="modal-overlay">
+            <div
+                class="modal-box"
+                style="
+                    width: 900px;
+                    height: 700px;
+                    flex-direction: row;
+                    overflow: hidden;
+                    max-width: 95vw;
+                    max-height: 95vh;
+                "
+            >
+                <div
+                    style="
+                        flex: 1;
+                        display: flex;
+                        flex-direction: column;
+                        background: #2a2a2a;
+                        position: relative;
+                        overflow: hidden;
+                    "
+                >
+                    <div class="editor-toolbar">
+                        <span
+                            style="
+                                color: #aaa;
+                                font-size: 12px;
+                                font-weight: 500;
+                            "
+                            >Graphic Editor (Sticker Mode)</span
+                        >
+                        <div style="flex: 1"></div>
+                        <span
+                            style="
+                                color: #888;
+                                font-size: 11px;
+                                margin-right: 15px;
+                            "
+                            >Mouse Wheel to Zoom • Middle-click drag to
+                            Pan</span
+                        >
+                        <span
+                            id="zoomLabel"
+                            style="
+                                color: #fff;
+                                font-size: 12px;
+                                font-family: monospace;
+                            "
+                            >100%</span
+                        >
+                    </div>
+                    <div
+                        id="overlayEditorContainer"
+                        class="overlay-editor-container"
+                    >
+                        <div id="overlayCanvas" class="overlay-canvas">
+                            <img id="overlayBaseImg" class="overlay-base" />
+                            <div
+                                id="overlayTargetWrapper"
+                                class="overlay-target-wrapper"
+                            >
+                                <img
+                                    id="overlayTargetImg"
+                                    class="overlay-target-img"
+                                    draggable="false"
+                                />
+                                <div
+                                    class="resize-handle nw"
+                                    data-handle="nw"
+                                ></div>
+                                <div
+                                    class="resize-handle ne"
+                                    data-handle="ne"
+                                ></div>
+                                <div
+                                    class="resize-handle sw"
+                                    data-handle="sw"
+                                ></div>
+                                <div
+                                    class="resize-handle se"
+                                    data-handle="se"
+                                ></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="overlay-props-panel">
+                    <div
+                        class="modal-header"
+                        style="
+                            padding: 15px;
+                            border-bottom: 1px solid #ddd;
+                            background: #f9fafb;
+                        "
+                    >
+                        <h3 style="font-size: 14px; margin: 0">Properties</h3>
+                        <button
+                            class="close-btn"
+                            onclick="closeModal('overlayModal')"
+                        >
+                            &times;
+                        </button>
+                    </div>
+                    <div style="padding: 15px; flex: 1; overflow-y: auto">
+                        <div class="form-group">
+                            <label>Pos X (%)</label>
+                            <input
+                                type="number"
+                                id="propX"
+                                step="0.1"
+                                oninput="updateOverlayFromProps()"
+                            />
+                        </div>
+                        <div class="form-group">
+                            <label>Pos Y (%)</label>
+                            <input
+                                type="number"
+                                id="propY"
+                                step="0.1"
+                                oninput="updateOverlayFromProps()"
+                            />
+                        </div>
+                        <div class="form-group">
+                            <label>Scale (Factor)</label>
+                            <input
+                                type="number"
+                                id="propScale"
+                                step="0.01"
+                                min="0.1"
+                                oninput="updateOverlayFromProps()"
+                            />
+                        </div>
+                        <hr
+                            style="
+                                border: 0;
+                                border-top: 1px solid #eee;
+                                margin: 20px 0;
+                            "
+                        />
+                        <p
+                            style="
+                                font-size: 11px;
+                                color: #666;
+                                line-height: 1.4;
+                            "
+                        >
+                            Use the handles to resize.<br />
+                            Drag to move.<br />
+                            Values are relative to the base image size.
+                        </p>
+                    </div>
+                    <div class="modal-footer">
+                        <button
+                            class="primary-btn"
+                            style="width: 100%"
+                            onclick="saveOverlayPosition()"
+                        >
+                            Apply & Save
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div id="addCharModal" class="modal-overlay">
+            <div class="modal-box">
+                <div class="modal-header">
+                    <h3>Add New Character</h3>
+                    <button
+                        class="close-btn"
+                        onclick="closeModal('addCharModal')"
+                    >
+                        &times;
+                    </button>
+                </div>
+                <div class="modal-body">
+                    <div class="form-group">
+                        <label>Name</label>
+                        <input
+                            type="text"
+                            id="newCharName"
+                            placeholder="Character Name"
+                        />
+                    </div>
+                    <div class="form-group">
+                        <label>Main Sprite (Optional)</label>
+                        <input
+                            type="file"
+                            id="newCharSprite"
+                            accept="image/*"
+                        />
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button class="primary-btn" onclick="createNewCharacter()">
+                        Create
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <div id="slideContextMenu" class="context-menu">
+            <button onclick="contextMenuAction('copy')">Copy</button>
+            <button onclick="contextMenuAction('cut')">Cut</button>
+            <button onclick="contextMenuAction('duplicate')">Duplicate</button>
+            <button class="danger" onclick="contextMenuAction('remove')">
+                Remove
+            </button>
+        </div>
+
+        <script src="main.js"></script>
+    </body>
+</html>
