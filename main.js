@@ -1,15 +1,29 @@
 let project = {
-  assets: { backgrounds: [] },
+  assets: {
+    backgrounds: [],
+  },
   characters: [
     {
       id: "c1",
       name: "Hiro",
       color: "#60a5fa",
       bodies: [
-        { name: "uniform", color: "#60a5fa", url: null, fileName: null },
+        {
+          name: "uniform",
+          color: "#60a5fa",
+          url: null,
+          fileName: null,
+        },
       ],
       faces: [
-        { name: "smile", x: 50, y: 20, scale: 1.0, url: null, fileName: null },
+        {
+          name: "smile",
+          x: 50,
+          y: 20,
+          scale: 1.0,
+          url: null,
+          fileName: null,
+        },
       ],
     },
   ],
@@ -176,7 +190,7 @@ function deleteFrame() {
 function updateSlotProp(key, val) {
   if (selectedSlotIndex === -1) return;
   const slot = getFrame().slots[selectedSlotIndex];
-  if (key === "scale" || key === "x" || key === "y") {
+  if (key === "scale" || key === "x" || key === "y" || key === "zIndex") {
     const n = parseFloat(val);
     slot[key] = Number.isFinite(n) ? n : key === "scale" ? 1 : 0;
   } else slot[key] = val;
@@ -246,6 +260,7 @@ function addCharToSlot(index, charId) {
     scale: 1,
     x: 0,
     y: 0,
+    zIndex: 0,
   };
   selectedSlotIndex = index;
   renderStage();
@@ -270,6 +285,19 @@ function addCharacter() {
   openModal("addCharModal");
 }
 
+function deleteCharacter(id) {
+  if (!confirm("Are you sure you want to delete this character?")) return;
+  project.characters = project.characters.filter((c) => c.id !== id);
+  if (editingCharId === id) {
+    editingCharId =
+      project.characters.length > 0 ? project.characters[0].id : null;
+  }
+  renderCharModal();
+  renderCastPalette();
+  renderStage();
+  renderFilmstrip();
+}
+
 function createNewCharacter() {
   const name = document.getElementById("newCharName").value.trim();
   const fileInput = document.getElementById("newCharSprite");
@@ -278,9 +306,23 @@ function createNewCharacter() {
     id: "c" + Date.now(),
     name,
     color: "#3b82f6",
-    bodies: [{ name: "default", color: "#3b82f6", url: null, fileName: null }],
+    bodies: [
+      {
+        name: "default",
+        color: "#3b82f6",
+        url: null,
+        fileName: null,
+      },
+    ],
     faces: [
-      { name: "neutral", x: 50, y: 20, scale: 1.0, url: null, fileName: null },
+      {
+        name: "neutral",
+        x: 50,
+        y: 20,
+        scale: 1.0,
+        url: null,
+        fileName: null,
+      },
     ],
   };
   project.characters.push(newChar);
@@ -342,6 +384,13 @@ function renderStage() {
     const zone = document.querySelector(`.slot-zone[data-slot="${i}"]`);
     zone.innerHTML = "";
     const slot = frame.slots[i];
+
+    if (slot && slot.zIndex !== undefined) {
+      zone.style.zIndex = slot.zIndex;
+    } else {
+      zone.style.zIndex = "";
+    }
+
     if (!slot) continue;
 
     const char = project.characters.find((c) => c.id === slot.charId);
@@ -498,11 +547,12 @@ function renderInspector() {
   ].join("");
 
   container.innerHTML = `
-    <div style="margin-bottom:15px;padding-bottom:10px;border-bottom:1px solid #eee;"><strong>Editing: ${char.name}</strong> (Slot ${selectedSlotIndex})</div>
+    <div style="margin-bottom:15px;padding-bottom:10px;border-bottom:1px solid #eee;"><strong>${char.name}</strong> (Slot ${selectedSlotIndex})</div>
     <div class="form-group"><label>Body Sprite (Base Layer)</label><select onchange="updateSlotProp('body',this.value)">${bodyOpts}</select></div>
     <div class="form-group"><label>Face Expression (Overlay Layer)</label><select onchange="updateSlotProp('face',this.value)">${faceOpts}</select></div>
     <div class="form-group" style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
       <div><label>Scale</label><input type="number" step="0.1" value="${slot.scale || 1}" onchange="updateSlotProp('scale',this.value)"></div>
+      <div><label>Layer Index</label><input type="number" step="1" value="${slot.zIndex !== undefined ? slot.zIndex : 0}" onchange="updateSlotProp('zIndex',this.value)"></div>
     </div>
     <div class="form-group" style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
       <div><label>Pos X</label><input type="number" step="10" value="${slot.x || 0}" onchange="updateSlotProp('x',this.value)"></div>
@@ -630,6 +680,7 @@ function openPreview() {
   openModal("previewModal");
   renderPreviewFrame();
 }
+
 function nextPreview() {
   const chapter = getChapter();
   if (previewCurrentIndex < chapter.frames.length - 1) {
@@ -903,9 +954,11 @@ function drop(ev) {
 function onFrameDragStart(e) {
   e.dataTransfer.setData("idx", e.currentTarget.dataset.idx);
 }
+
 function onFrameDragOver(e) {
   e.preventDefault();
 }
+
 function onFrameDrop(e) {
   e.preventDefault();
   reorderFrames(
@@ -913,23 +966,28 @@ function onFrameDrop(e) {
     parseInt(e.currentTarget.dataset.idx),
   );
 }
+
 function onFrameDragEnd(e) {}
 
 let contextFrameIndex = null;
+
 function hideSlideContextMenu() {
   document.getElementById("slideContextMenu").style.display = "none";
 }
+
 function showSlideContextMenu(x, y) {
   const menu = document.getElementById("slideContextMenu");
   menu.style.display = "block";
-  menu.style.left = x + "px";
-  menu.style.top = y + "px";
+  menu.style.left = x + 20 + "px";
+  menu.style.top = y - 30 + "px";
 }
+
 function onFrameContextMenu(e) {
   e.preventDefault();
   contextFrameIndex = parseInt(e.currentTarget.dataset.idx);
   showSlideContextMenu(e.clientX, e.clientY);
 }
+
 function contextMenuAction(act) {
   if (contextFrameIndex === null) return;
   if (act === "copy") copyFrameAt(contextFrameIndex);
@@ -957,6 +1015,7 @@ function saveJSON() {
 
 function exportJSON() {
   const data = deepClone(project);
+
   function clean(obj) {
     for (let k in obj) {
       if (typeof obj[k] === "object" && obj[k]) clean(obj[k]);
@@ -987,7 +1046,10 @@ function importJSON(e) {
       const imported = JSON.parse(ev.target.result);
       if (imported.characters && imported.chapters) {
         project = imported;
-        if (!project.assets) project.assets = { backgrounds: [] };
+        if (!project.assets)
+          project.assets = {
+            backgrounds: [],
+          };
         activeChapterId = project.chapters[0].id;
         loadChapter(activeChapterId);
         renderCastPalette();
@@ -1022,7 +1084,11 @@ function renderCharModal() {
         ? `background-image:url('${c.bodies[0].url}')`
         : `background-color:${c.color}`;
       return `<div class="list-item ${c.id === editingCharId ? "selected" : ""}" onclick="editingCharId='${c.id}';renderCharModal();">
-              <div class="img-preview-mini" style="${thumb}"></div>${c.name}
+              <div class="char-item-left">
+                  <div class="img-preview-mini" style="${thumb}"></div>
+                  <span>${c.name}</span>
+              </div>
+              <button class="list-item-del-btn" onclick="event.stopPropagation(); deleteCharacter('${c.id}')" title="Delete Character">Remove</button>
             </div>`;
     })
     .join("");
@@ -1042,7 +1108,7 @@ function renderCharModal() {
         <div class="img-preview-mini" style="${b.url ? `background-image:url('${b.url}')` : `background-color:${b.color}`}"></div>
         <input type="text" value="${b.name}" onchange="updateCharLayer('bodies',${i},'name',this.value)" placeholder="Body Name">
         <label class="upload-btn">Upload<input type="file" onchange="uploadLayerImage('bodies',${i},this)" hidden accept="image/*"></label>
-        <button class="danger" onclick="removeCharLayer('bodies',${i})" title="Remove">×</button>
+        <button class="danger" onclick="removeCharLayer('bodies',${i})" title="Remove">Remove</button>
       </div>`,
     )
     .join("");
@@ -1055,7 +1121,7 @@ function renderCharModal() {
         <input type="text" value="${f.name}" onchange="updateCharLayer('faces',${i},'name',this.value)" placeholder="Expression Name">
         <label class="upload-btn">Upload<input type="file" onchange="uploadLayerImage('faces',${i},this)" hidden accept="image/*"></label>
         <button class="primary-btn" onclick="openOverlayEditor(${i})" ">Graphic Editor</button>
-        <button class="danger" onclick="removeCharLayer('faces',${i})" title="Remove">×</button>
+        <button class="danger" onclick="removeCharLayer('faces',${i})" title="Remove">Remove</button>
       </div>`,
     )
     .join("");
@@ -1117,11 +1183,13 @@ function updateCharPropEditor(key, val) {
   renderCastPalette();
   renderStage();
 }
+
 function updateCharLayer(type, idx, key, val) {
   const char = project.characters.find((c) => c.id === editingCharId);
   if (char && char[type][idx]) char[type][idx][key] = val;
   renderStage();
 }
+
 function addCharLayer(type) {
   const char = project.characters.find((c) => c.id === editingCharId);
   if (type === "bodies")
@@ -1142,12 +1210,14 @@ function addCharLayer(type) {
     });
   renderCharModal();
 }
+
 function removeCharLayer(type, idx) {
   const char = project.characters.find((c) => c.id === editingCharId);
   char[type].splice(idx, 1);
   renderCharModal();
   renderStage();
 }
+
 function uploadLayerImage(type, idx, input) {
   if (!input.files[0]) return;
   readFileAsDataURL(input.files[0], (url, fn) => {
@@ -1200,7 +1270,10 @@ function init() {
   renderCastPalette();
   loadChapter(1);
   if (!project.assets.backgrounds.length)
-    project.assets.backgrounds.push({ name: "default_bg", url: "" });
+    project.assets.backgrounds.push({
+      name: "default_bg",
+      url: "",
+    });
   initOverlayEditorEvents();
   document.addEventListener("click", (e) => {
     if (!document.getElementById("slideContextMenu").contains(e.target))
@@ -1212,7 +1285,11 @@ function init() {
     const name = prompt("Background name:");
     if (!name) return;
     readFileAsDataURL(file, (url, fn) => {
-      project.assets.backgrounds.push({ name, url, fileName: fn });
+      project.assets.backgrounds.push({
+        name,
+        url,
+        fileName: fn,
+      });
       renderAssetModal();
     });
   });

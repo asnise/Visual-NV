@@ -298,7 +298,7 @@ button {
     display: flex;
     justify-content: center;
     align-items: flex-end;
-    transform-origin: bottom center;
+    transform-origin: center;
     pointer-events: none;
     transition: transform 0.1s;
 }
@@ -316,7 +316,7 @@ button {
     background-size: contain;
     background-repeat: no-repeat;
     background-position: center;
-    transform: translate(-50%, -50%);
+    transform: translate(-50%, -50%) scale(0.75);
 }
 
 .stage-dialogue-box {
@@ -636,6 +636,38 @@ textarea {
     border-left: 3px solid var(--primary);
 }
 
+.char-item-left {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex: 1;
+    overflow: hidden;
+}
+
+.char-item-left span {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.list-item-del-btn {
+    padding: 4px 8px;
+    background: transparent;
+    border: 1px solid #eff6ff;
+    color: #9ca3af;
+    border-radius: 4px;
+    font-size: 16px;
+    line-height: 1;
+    margin-left: 10px;
+    transition: all 0.2s;
+}
+
+.list-item-del-btn:hover {
+    background: #fee2e2;
+    color: #ef4444;
+    border-color: #ef4444;
+}
+
 .preview-viewport {
     flex: 1;
     background: #000;
@@ -673,7 +705,7 @@ textarea {
     display: flex;
     justify-content: center;
     align-items: flex-end;
-    transform-origin: bottom center;
+    transform-origin: center;
 }
 
 .p-char-img {
