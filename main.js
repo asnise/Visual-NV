@@ -47,7 +47,6 @@ let project = {
 let activeChapterId = 1;
 let activeFrameIndex = 0;
 let selectedSlotIndex = -1;
-let previewCurrentIndex = 0;
 let editingCharId = null;
 let editingOverlayIdx = -1;
 let frameClipboard = null;
@@ -261,6 +260,7 @@ function addCharToSlot(index, charId) {
     x: 0,
     y: 0,
     zIndex: 0,
+    mirror: false,
   };
   selectedSlotIndex = index;
   renderStage();
@@ -414,7 +414,7 @@ function renderStage() {
 
     const wrapper = document.createElement("div");
     wrapper.className = "char-visual";
-    wrapper.style.transform = `translate(${slot.x || 0}px, ${slot.y || 0}px) scale(${slot.scale || 1})`;
+    wrapper.style.transform = `translate(${slot.x || 0}px, ${slot.y || 0}px) scale(${slot.scale || 1}) scaleX(${slot.mirror ? -1 : 1})`;
 
     if (body?.url) {
       const img = document.createElement("img");
@@ -458,7 +458,9 @@ function renderStage() {
     if (i === selectedSlotIndex) {
       const closeBtn = document.createElement("div");
       closeBtn.textContent = "Remove";
-      closeBtn.className = "char-remove-btn";
+      // Use destructive button style and inline layout to preserve position
+      closeBtn.className = "danger";
+      closeBtn.style.cssText = "position:absolute;top:8px;right:8px;padding:4px 8px;border-radius:5px;font-size:12px;line-height:1;text-align:center;cursor:pointer;z-index:20;background:var(--danger);color:#fff;border:1px solid var(--danger);";
       closeBtn.onclick = (e) => {
         e.stopPropagation();
         clearSlot(i);
@@ -525,8 +527,8 @@ function renderInspector() {
     container.innerHTML = `
       <div class="form-group"><label>Speaker</label><select onchange="updateSpeaker(this.value)"><option value="">(Narrator)</option>${speakerOpts}</select></div>
       <div class="form-group"><label>Dialogue Text</label><textarea oninput="updateText(this.value)">${frame.text || ""}</textarea></div>
-      <div class="form-group"><label>Background</label><select onchange="updateBackground(this.value)">${bgOpts}</select><button class="text-btn" onclick="openModal('assetsModal')">Manage</button></div>
-      <button class="delete-slide-btn" onclick="deleteFrame()">Delete Slide</button>`;
+      <div class="form-group"><label>Background</label><select onchange="updateBackground(this.value)">${bgOpts}</select><button class="primary-btn" onclick="openModal('assetsModal')">Manage</button></div>
+      <button class="danger" onclick="deleteFrame()">Delete Slide</button>`;
     return;
   }
 
@@ -554,6 +556,9 @@ function renderInspector() {
       <div><label>Scale</label><input type="number" step="0.1" value="${slot.scale || 1}" onchange="updateSlotProp('scale',this.value)"></div>
       <div><label>Layer Index</label><input type="number" step="1" value="${slot.zIndex !== undefined ? slot.zIndex : 0}" onchange="updateSlotProp('zIndex',this.value)"></div>
     </div>
+    <div class="form-group" style="display:flex;align-items:center;gap:10px;">
+        <label><input type="checkbox" ${slot.mirror ? "checked" : ""} onchange="updateSlotProp('mirror',this.checked)"> Mirror X</label>
+    </div>
     <div class="form-group" style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
       <div><label>Pos X</label><input type="number" step="10" value="${slot.x || 0}" onchange="updateSlotProp('x',this.value)"></div>
       <div><label>Pos Y</label><input type="number" step="10" value="${slot.y || 0}" onchange="updateSlotProp('y',this.value)"></div>
@@ -564,129 +569,7 @@ function renderInspector() {
       <option value="slide_left" ${slot.anim === "slide_left" ? "selected" : ""}>Slide Left</option>
       <option value="slide_right" ${slot.anim === "slide_right" ? "selected" : ""}>Slide Right</option>
     </select></div>
-    <button class="delete-slide-btn" onclick="clearSlot(${selectedSlotIndex})">Remove Character</button>`;
-}
-
-function updatePreviewRatio() {
-  const select = document.getElementById("previewRatio");
-  const customInput = document.getElementById("customRatio");
-  const vp = document.getElementById("pViewport");
-  if (select.value === "custom") {
-    customInput.style.display = "inline-block";
-    applyCustomRatio();
-  } else {
-    customInput.style.display = "none";
-    const ratio = select.value.split(":");
-    const w = parseInt(ratio[0]);
-    const h = parseInt(ratio[1]);
-    vp.style.aspectRatio = `${w}/${h}`;
-  }
-}
-
-function applyCustomRatio() {
-  const input = document.getElementById("customRatio").value.trim();
-  const vp = document.getElementById("pViewport");
-  if (/^\d+:\d+$/.test(input)) {
-    vp.style.aspectRatio = input.replace(":", "/");
-  }
-}
-
-function renderPreviewFrame() {
-  const chapter = getChapter();
-  const frame = chapter.frames[previewCurrentIndex];
-  const bgObj = project.assets.backgrounds.find(
-    (b) => b.name === frame.background,
-  );
-  const vp = document.getElementById("pViewport");
-  vp.style.backgroundImage = bgObj?.url ? `url('${bgObj.url}')` : "none";
-
-  const speaker = project.characters.find((c) => c.id === frame.speakerId);
-  document.getElementById("pSpeaker").textContent = speaker
-    ? speaker.name
-    : "Narrator";
-  document.getElementById("pSpeaker").style.color = speaker
-    ? speaker.color
-    : "#fff";
-
-  let text = frame.text || "";
-  text = text.replace(
-    /\{([^}]+)\}/g,
-    '<span style="color:#3b82f6;font-weight:bold;">[$1]</span>',
-  );
-  document.getElementById("pText").innerHTML = text;
-
-  const dialogueLayer = document.querySelector(".p-dialogue-layer");
-  dialogueLayer.classList.toggle("visible", !!frame.text);
-
-  for (let i = 0; i < 4; i++) {
-    const slotEl = document.getElementById(`pSlot${i}`);
-    slotEl.innerHTML = "";
-    const slot = frame.slots[i];
-    if (!slot) continue;
-
-    const char = project.characters.find((c) => c.id === slot.charId);
-    if (!char) continue;
-
-    const body =
-      char.bodies.find((b) => b.name === slot.body) || char.bodies[0];
-    const face =
-      slot.face && slot.face !== "none"
-        ? char.faces.find((f) => f.name === slot.face)
-        : null;
-
-    const charDiv = document.createElement("div");
-    charDiv.className = "p-char";
-
-    const visual = document.createElement("div");
-    visual.className = "p-char-visual";
-    visual.style.transform = `translate(${slot.x || 0}px, ${slot.y || 0}px) scale(${slot.scale || 1})`;
-
-    if (slot.anim && slot.anim !== "none") {
-      let animClass = "preview-char-enter-fade";
-      if (slot.anim === "slide_left") animClass = "preview-char-enter-left";
-      if (slot.anim === "slide_right") animClass = "preview-char-enter-right";
-      visual.classList.add(animClass);
-    }
-
-    if (body?.url) {
-      const img = document.createElement("img");
-      img.src = body.url;
-      img.className = "p-char-img";
-      img.style.position = "relative";
-      img.style.zIndex = "1";
-      visual.appendChild(img);
-    }
-
-    if (face?.url) {
-      const faceEl = document.createElement("div");
-      faceEl.className = "p-char-face";
-      const size = OVERLAY_BASE_SIZE * (face.scale || 1);
-      faceEl.style.left = `${face.x}%`;
-      faceEl.style.top = `${face.y}%`;
-      faceEl.style.width = `${size}px`;
-      faceEl.style.height = `${size}px`;
-      faceEl.style.backgroundImage = `url('${face.url}')`;
-      faceEl.style.zIndex = "2";
-      visual.appendChild(faceEl);
-    }
-
-    charDiv.appendChild(visual);
-    slotEl.appendChild(charDiv);
-  }
-}
-
-function openPreview() {
-  previewCurrentIndex = activeFrameIndex;
-  openModal("previewModal");
-  renderPreviewFrame();
-}
-
-function nextPreview() {
-  const chapter = getChapter();
-  if (previewCurrentIndex < chapter.frames.length - 1) {
-    previewCurrentIndex++;
-    renderPreviewFrame();
-  } else closeModal("previewModal");
+    <button class="danger" onclick="clearSlot(${selectedSlotIndex})">Remove Character</button>`;
 }
 
 function initOverlayEditorEvents() {
@@ -1088,7 +971,7 @@ function renderCharModal() {
                   <div class="img-preview-mini" style="${thumb}"></div>
                   <span>${c.name}</span>
               </div>
-              <button class="list-item-del-btn" onclick="event.stopPropagation(); deleteCharacter('${c.id}')" title="Delete Character">Remove</button>
+              <button class="danger" onclick="event.stopPropagation(); deleteCharacter('${c.id}')" title="Delete Character">Remove</button>
             </div>`;
     })
     .join("");
@@ -1107,7 +990,7 @@ function renderCharModal() {
       <div class="layer-row">
         <div class="img-preview-mini" style="${b.url ? `background-image:url('${b.url}')` : `background-color:${b.color}`}"></div>
         <input type="text" value="${b.name}" onchange="updateCharLayer('bodies',${i},'name',this.value)" placeholder="Body Name">
-        <label class="upload-btn">Upload<input type="file" onchange="uploadLayerImage('bodies',${i},this)" hidden accept="image/*"></label>
+  <label class="primary-btn">Upload<input type="file" onchange="uploadLayerImage('bodies',${i},this)" hidden accept="image/*"></label>
         <button class="danger" onclick="removeCharLayer('bodies',${i})" title="Remove">Remove</button>
       </div>`,
     )
@@ -1119,45 +1002,45 @@ function renderCharModal() {
       <div class="layer-row">
         <div class="img-preview-mini" style="${f.url ? `background-image:url('${f.url}')` : ""}"></div>
         <input type="text" value="${f.name}" onchange="updateCharLayer('faces',${i},'name',this.value)" placeholder="Expression Name">
-        <label class="upload-btn">Upload<input type="file" onchange="uploadLayerImage('faces',${i},this)" hidden accept="image/*"></label>
-        <button class="primary-btn" onclick="openOverlayEditor(${i})" ">Graphic Editor</button>
+  <label class="primary-btn">Upload<input type="file" onchange="uploadLayerImage('faces',${i},this)" hidden accept="image/*"></label>
+  <button class="primary-btn" onclick="openOverlayEditor(${i})">Graphic Editor</button>
         <button class="danger" onclick="removeCharLayer('faces',${i})" title="Remove">Remove</button>
       </div>`,
     )
     .join("");
 
   editPane.innerHTML = `
-    <div style="padding:15px;background:#fff;">
-      <label style="font-size:12px;color:#666;text-transform:uppercase;letter-spacing:0.5px;display:block;margin-bottom:4px;">Character Name</label>
-      <input type="text" value="${char.name}" onchange="updateCharPropEditor('name',this.value)" style="font-size:18px;font-weight:600;width:100%;padding:8px;border:1px solid #ddd;border-radius:4px;">
-    </div>
+      <div style="padding:15px;background:var(--bg-panel);">
+        <label style="font-size:12px;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.5px;display:block;margin-bottom:4px;">Character Name</label>
+        <input type="text" value="${char.name}" onchange="updateCharPropEditor('name',this.value)" style="font-size:18px;font-weight:600;width:100%;padding:8px;border:1px solid var(--border);border-radius:4px;background:var(--bg-panel);color:var(--text-main);">
+      </div>
 
-    <div class="chrome-tabs">
-      <div class="chrome-tab active" onclick="showLayerTab('bodies')">Body Sprites (Base)</div>
-      <div class="chrome-tab" onclick="showLayerTab('faces')">Expressions (Overlays)</div>
-    </div>
+      <div class="chrome-tabs">
+        <div class="chrome-tab active" onclick="showLayerTab('bodies')">Body Sprites (Base)</div>
+        <div class="chrome-tab" onclick="showLayerTab('faces')">Expressions (Overlays)</div>
+      </div>
 
-    <div class="edit-scroll-area" style="padding:15px; overflow-y:auto; flex:1;">
-        <div id="tab-bodies-content" style="display:block;">
-            <div class="section-header" style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
-                <h4 style="margin:0;font-size:14px;color:#333;">Body Sprites (Base)</h4>
-                <button class="text-btn" onclick="addCharLayer('bodies')">+ Add Body</button>
-            </div>
-            <div class="layers-list" style="margin-bottom:20px;">
-                ${bodiesHtml}
-            </div>
-        </div>
+      <div class="edit-scroll-area" style="padding:15px; overflow-y:auto; flex:1;">
+          <div id="tab-bodies-content" style="display:block;">
+              <div class="section-header" style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
+                  <h4 style="margin:0;font-size:14px;color:var(--text-main);">Body Sprites (Base)</h4>
+                  <button class="primary-btn" onclick="addCharLayer('bodies')">+ Add Body</button>
+              </div>
+              <div class="layers-list" style="margin-bottom:20px;">
+                  ${bodiesHtml}
+              </div>
+          </div>
 
-        <div id="tab-faces-content" style="display:none;">
-            <div class="section-header" style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
-                <h4 style="margin:0;font-size:14px;color:#333;">Expressions (Overlays)</h4>
-                <button class="text-btn" onclick="addCharLayer('faces')">+ Add Expression</button>
-            </div>
-            <div class="layers-list">
-                ${facesHtml}
-            </div>
-        </div>
-    </div>`;
+          <div id="tab-faces-content" style="display:none;">
+              <div class="section-header" style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
+                  <h4 style="margin:0;font-size:14px;color:var(--text-main);">Expressions (Overlays)</h4>
+                  <button class="primary-btn" onclick="addCharLayer('faces')">+ Add Expression</button>
+              </div>
+              <div class="layers-list">
+                  ${facesHtml}
+              </div>
+          </div>
+      </div>`;
 }
 
 function showLayerTab(tabName) {
@@ -1260,7 +1143,7 @@ function renderChapterMgmt() {
       (ch) => `
     <div class="list-item ${ch.id === activeChapterId ? "selected" : ""}" onclick="loadChapter(${ch.id})">
       <input type="text" value="${ch.title}" onchange="project.chapters.find(c => c.id === ${ch.id}).title = this.value">
-      <button onclick="event.stopPropagation(); deleteChapter(${ch.id})">Delete</button>
+      <button class="danger" onclick="event.stopPropagation(); deleteChapter(${ch.id})">Delete</button>
     </div>`,
     )
     .join("");
@@ -1296,6 +1179,10 @@ function init() {
   renderInspector();
   renderFilmstrip();
   renderStage();
+
+  if (typeof initSettingsModal === "function") {
+    initSettingsModal();
+  }
 }
 
 init();

@@ -1,14 +1,62 @@
 :root {
-    --bg-app: #f3f4f6;
+    /* Light Theme Colors */
+    --bg-app: #f8fafc;
     --bg-panel: #ffffff;
+    --bg-secondary: #f1f5f9;
     --primary: #3b82f6;
     --primary-hover: #2563eb;
-    --text-main: #1f2937;
-    --text-muted: #6b7280;
-    --border: #e5e7eb;
-    --hover-bg: #f9fafb;
-    --selected-bg: #eff6ff;
-    --slot-drag: rgba(59, 130, 246, 0.15);
+    --primary-light: #60a5fa;
+    --text-main: #1e293b;
+    --text-muted: #64748b;
+    --text-subtle: #94a3b8;
+    --border: #e2e8f0;
+    --border-light: #f1f5f9;
+    --hover-bg: #f8fafc;
+    --selected-bg: #dbeafe;
+    --slot-drag: rgba(59, 130, 246, 0.12);
+    --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+    --shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+    --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+    --danger: #ef4444;
+    --danger-hover: #dc2626;
+    --success: #10b981;
+    --warning: #f59e0b;
+
+    /* Transitions */
+    --transition-fast: 150ms cubic-bezier(0.4, 0, 0.2, 1);
+    --transition-base: 200ms cubic-bezier(0.4, 0, 0.2, 1);
+    --transition-slow: 300ms cubic-bezier(0.4, 0, 0.2, 1);
+
+    /* Border Radius */
+    --radius-sm: 4px;
+    --radius-md: 6px;
+    --radius-lg: 8px;
+    --radius-xl: 12px;
+}
+
+[data-theme="dark"] {
+    /* Dark Theme Colors - Unity Engine Style */
+    --bg-app: #202020;
+    --bg-panel: #383838;
+    --bg-secondary: #2d2d2d;
+    --primary: #4c9aff;
+    --primary-hover: #6cb3ff;
+    --primary-light: #7fbfff;
+    --text-main: #d4d4d4;
+    --text-muted: #b4b4b4;
+    --text-subtle: #858585;
+    --border: #1a1a1a;
+    --border-light: #505050;
+    --hover-bg: #2d2d2d;
+    --selected-bg: #2c5070;
+    --slot-drag: rgba(76, 154, 255, 0.2);
+    --shadow-sm: 0 1px 3px 0 rgba(0, 0, 0, 0.5);
+    --shadow: 0 4px 8px -2px rgba(0, 0, 0, 0.7);
+    --shadow-lg: 0 10px 20px -5px rgba(0, 0, 0, 0.8);
+    --danger: #ff6b6b;
+    --danger-hover: #ff5252;
+    --success: #4caf50;
+    --warning: #ffa726;
 }
 
 body {
@@ -27,7 +75,7 @@ header {
     background: var(--bg-panel);
     border-bottom: 1px solid var(--border);
     height: 40px;
-    padding: 0 10px;
+    padding: 5px 10px;
     display: flex;
     align-items: center;
     justify-content: space-between;
@@ -61,7 +109,7 @@ header {
     position: absolute;
     top: 100%;
     left: 0;
-    background-color: white;
+    background-color: var(--bg-panel);
     min-width: 180px;
     box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
     border: 1px solid var(--border);
@@ -110,49 +158,110 @@ button {
     transition: all 0.2s;
     border: 1px solid transparent;
     font-weight: 500;
+    background: var(--bg-panel);
+    color: var(--text-main);
+}
+
+button:hover {
+    background: var(--hover-bg);
 }
 
 .modal-box {
     box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
 }
 
-.primary-btn {
-    background: var(--primary);
-    color: white;
-    border: 1px solid var(--primary);
-    padding: 6px 12px;
-}
-
-.primary-btn:hover {
-    background: #fff;
-    color: var(--primary);
-}
-
-.text-btn {
-    background: #fff;
-    border: 1px solid var(--primary);
-    color: var(--primary);
-    padding: 5px;
-    transform: 0.2s;
-}
-
-.text-btn:hover {
-    color: white;
-    background: var(--primary);
-    border: 1px solid var(--primary);
-}
-
-.close-btn {
-    font-size: 20px;
+/* Primary button — used for main actions and labels that act like buttons */
+.primary-btn,
+label.primary-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
     background: transparent;
-    color: #999;
-    padding: 0 5px;
-    border: none;
+    color: var(--primary);
+    border: 1px solid var(--primary);
+    padding: 8px 14px;
+    border-radius: 5px;
+    font-weight: 600;
+    font-size: 13px;
+    cursor: pointer;
+    text-decoration: none;
+    /* transition: 0.1s; */
 }
 
-.close-btn:hover {
-    color: #333;
+.primary-btn:hover,
+label.primary-btn:hover {
+    background: var(--primary);
+    color: #fff;
 }
+
+.primary-btn:active {
+    transform: translateY(1px);
+}
+.primary-btn:focus {
+    outline: none;
+    box-shadow: 0 0 0 5px rgba(59, 130, 246, 0.12);
+}
+.primary-btn.small {
+    padding: 4px 8px;
+    font-size: 12px;
+    border-radius: 6px;
+}
+
+/* Danger (destructive) buttons */
+.danger,
+label.danger {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    background: transparent;
+    color: var(--danger);
+    border: 1px solid var(--danger);
+    padding: 8px 12px;
+    border-radius: 5px;
+    font-weight: 600;
+    font-size: 13px;
+    cursor: pointer;
+    /* transition: 0.1s; */
+}
+
+.danger:hover,
+label.danger:hover {
+    background: var(--danger);
+    color: white;
+}
+.danger.small {
+    padding: 4px 8px;
+    font-size: 12px;
+    border-radius: 6px;
+}
+
+/* Hidden file inputs inside label buttons */
+label.primary-btn input[type="file"],
+label.danger input[type="file"] {
+    display: none;
+}
+
+/* Disabled state */
+button[disabled],
+.primary-btn[disabled],
+.danger[disabled] {
+    opacity: 0.6;
+    pointer-events: none;
+}
+
+/* Theme-specific tweaks */
+[data-theme="dark"] .primary-btn,
+[data-theme="dark"] label.primary-btn {
+    border-color: rgba(255, 255, 255, 0.06);
+}
+
+[data-theme="dark"] .danger,
+[data-theme="dark"] label.danger {
+    border-color: rgba(255, 255, 255, 0.06);
+}
+/* Note: Only `.primary-btn` and `.danger` button types are supported. */
 
 .workspace {
     display: flex;
@@ -178,7 +287,7 @@ button {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    background: #fafafa;
+    background: var(--hover-bg);
 }
 
 .cast-grid {
@@ -192,7 +301,7 @@ button {
     align-items: center;
     gap: 10px;
     padding: 10px;
-    background: white;
+    background: var(--bg-panel);
     border: 1px solid var(--border);
     border-radius: 6px;
     margin-bottom: 8px;
@@ -216,17 +325,17 @@ button {
     width: 32px;
     height: 32px;
     border-radius: 4px;
-    border: 1px solid #ddd;
+    border: 1px solid var(--border);
     background-size: cover;
     background-position: top center;
-    background-color: #eee;
+    background-color: var(--hover-bg);
 }
 
 .stage-area {
     flex: 1;
     display: flex;
     flex-direction: column;
-    background: #e5e7eb;
+    background: var(--bg-app);
     position: relative;
 }
 
@@ -242,7 +351,7 @@ button {
 .visual-stage {
     width: 900px;
     height: 550px;
-    background: white;
+    background: var(--bg-panel);
     box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
     border-radius: 4px;
     position: relative;
@@ -256,7 +365,7 @@ button {
 }
 
 .slot-zone {
-    border-right: 1px dashed rgba(0, 0, 0, 0.1);
+    border-right: 1px dashed var(--border);
     position: relative;
     transition: background 0.2s;
     height: 100%;
@@ -325,8 +434,8 @@ button {
     left: 20px;
     right: 20px;
     height: 100px;
-    background: rgba(255, 255, 255, 0.95);
-    border: 1px solid #ddd;
+    background: var(--bg-panel);
+    border: 1px solid var(--border);
     border-left: 4px solid var(--primary);
     border-radius: 4px;
     padding: 15px;
@@ -337,7 +446,6 @@ button {
 }
 
 .stage-dialogue-box:hover {
-    background: white;
     box-shadow: 0 6px 12px rgba(0, 0, 0, 0.1);
 }
 
@@ -354,14 +462,14 @@ button {
 }
 
 .d-text {
-    color: #333;
+    color: var(--text-main);
     font-size: 14px;
     line-height: 1.4;
 }
 
 .filmstrip-panel {
     height: 160px;
-    background: white;
+    background: var(--bg-panel);
     border-top: 1px solid var(--border);
     display: flex;
     flex-direction: column;
@@ -382,8 +490,8 @@ button {
     min-width: 120px;
     max-width: 120px;
     height: 100%;
-    background: #f3f4f6;
-    border: 2px solid transparent;
+    background: var(--bg-app);
+    border: 2px solid rgba(0, 0, 0, 0.15);
     border-radius: 6px;
     cursor: pointer;
     display: flex;
@@ -399,18 +507,18 @@ button {
 }
 
 .film-frame:hover {
-    background: #e5e7eb;
+    background: var(--hover-bg);
 }
 
 .film-frame.active {
     border-color: var(--primary);
-    background: white;
+    background: var(--bg-panel);
     box-shadow: 0 2px 8px rgba(59, 130, 246, 0.2);
 }
 
 .thumb-preview {
     flex: 1;
-    background: #e5e7eb;
+    background: var(--hover-bg);
     position: relative;
     display: flex;
     justify-content: center;
@@ -439,11 +547,11 @@ button {
     height: 24px;
     padding: 4px;
     font-size: 10px;
-    color: #666;
+    color: var(--text-muted);
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
-    background: white;
+    background: var(--bg-panel);
 }
 
 .inspector {
@@ -461,9 +569,9 @@ button {
     position: fixed;
     z-index: 10000;
     min-width: 160px;
-    background: #fff;
+    background: var(--bg-panel);
     border: 1px solid var(--border);
-    border-radius: 8px;
+    border-radius: 5px;
     box-shadow: 0 10px 30px rgba(0, 0, 0, 0.18);
     overflow: hidden;
     display: none;
@@ -488,28 +596,27 @@ button {
 .context-menu .danger {
     color: #b91c1c;
 }
-
-.delete-slide-btn,
-.danger {
-    background: #fff;
-    border: 1px solid #b91c1c;
-    color: #b91c1c;
-    transition: 0.2s;
-    width: 100%;
-}
+/* delete-slide-btn removed; use .danger instead */
 
 .asset-item {
     display: flex;
     justify-content: space-between;
     align-items: center;
     padding: 10px 12px;
-    border-bottom: 1px solid #d1d5db;
+    border-bottom: 1px solid var(--border);
 }
 
-.delete-slide-btn:hover,
+.danger {
+    background: var(--bg-panel);
+    border: 1px solid var(--danger);
+    color: var(--danger);
+    transition: 0.2s;
+}
+
 .danger:hover {
-    background: #b91c1c;
-    color: #fff;
+    background: var(--danger);
+    color: white;
+    border: 1px solid var(--danger);
 }
 
 .form-group {
@@ -536,11 +643,11 @@ textarea,
 select {
     width: 100%;
     padding: 8px 10px;
-    border: 1px solid #d1d5db;
+    border: 1px solid var(--border);
     border-radius: 4px;
     font-size: 13px;
     color: var(--text-main);
-    background: #fff;
+    background: var(--bg-panel);
     transition: border-color 0.2s;
     box-sizing: border-box;
 }
@@ -572,9 +679,9 @@ textarea {
 }
 
 .modal-box {
-    background: white;
+    background: var(--bg-panel);
     width: 450px;
-    border-radius: 8px;
+    border-radius: 5px;
     box-shadow:
         0 20px 25px -5px rgba(0, 0, 0, 0.1),
         0 10px 10px -5px rgba(0, 0, 0, 0.04);
@@ -613,13 +720,13 @@ textarea {
     border-top: 1px solid var(--border);
     display: flex;
     justify-content: flex-end;
-    background: #fafafa;
+    background: var(--hover-bg);
     border-radius: 0 0 8px 8px;
 }
 
 .list-item {
     padding: 10px;
-    border-bottom: 1px solid #f3f4f6;
+    border-bottom: 1px solid var(--bg-app);
     display: flex;
     justify-content: space-between;
     align-items: center;
@@ -628,7 +735,7 @@ textarea {
 }
 
 .list-item:hover {
-    background: #f9fafb;
+    background: var(--hover-bg);
 }
 
 .list-item.selected {
@@ -650,23 +757,7 @@ textarea {
     text-overflow: ellipsis;
 }
 
-.list-item-del-btn {
-    padding: 4px 8px;
-    background: transparent;
-    border: 1px solid #eff6ff;
-    color: #9ca3af;
-    border-radius: 4px;
-    font-size: 16px;
-    line-height: 1;
-    margin-left: 10px;
-    transition: all 0.2s;
-}
-
-.list-item-del-btn:hover {
-    background: #fee2e2;
-    color: #ef4444;
-    border-color: #ef4444;
-}
+/* Use .danger for destructive inline list actions */
 
 .preview-viewport {
     flex: 1;
@@ -733,7 +824,7 @@ textarea {
     min-height: 120px;
     background: rgba(0, 0, 0, 0.85);
 
-    border-radius: 8px;
+    border-radius: 5px;
     padding: 20px;
     color: white;
     z-index: 50;
@@ -788,7 +879,7 @@ textarea {
 
 .chrome-tabs {
     display: flex;
-    border-bottom: 1px solid #d0d7de;
+    border-bottom: 1px solid var(--border);
     padding: 0 10px;
     overflow-x: auto;
     scrollbar-width: none;
@@ -802,7 +893,7 @@ textarea {
     padding: 10px 20px;
     font-size: 13px;
     font-weight: 500;
-    color: #57606a;
+    color: var(--text-muted);
     cursor: pointer;
     position: relative;
     white-space: nowrap;
@@ -812,7 +903,7 @@ textarea {
 }
 
 .chrome-tab:hover {
-    background: #e6ebed;
+    background: var(--hover-bg);
 }
 
 .chrome-tab.active {
@@ -826,7 +917,7 @@ textarea {
 
 .tab-content-area {
     padding: 20px;
-    background: white;
+    background: var(--bg-panel);
     flex: 1;
     overflow-y: auto;
 }
@@ -838,9 +929,9 @@ textarea {
     margin-bottom: 8px;
     align-items: center;
     padding: 8px;
-    border: 1px solid #eee;
+    border: 1px solid var(--border);
     border-radius: 6px;
-    background: #fafafa;
+    background: var(--hover-bg);
 }
 
 .img-preview-mini {
@@ -877,28 +968,6 @@ textarea {
     height: 100%;
     transition: transform 0.05s ease-out;
     transform-origin: center center;
-}
-
-.char-remove-btn {
-    position: absolute;
-    top: 8px;
-    right: 8px;
-    border: 1px solid #fa0734;
-    background: #fa0734;
-    color: #fff;
-    padding: 4px 8px;
-    border-radius: 5px;
-    font-size: 16px;
-    line-height: 22px;
-    text-align: center;
-    cursor: pointer;
-    z-index: 20;
-    transition: 0.2s;
-}
-
-.char-remove-btn:hover {
-    background: #ffff;
-    color: #fa0734;
 }
 
 .overlay-base {
@@ -940,21 +1009,7 @@ textarea {
     z-index: 11;
 }
 
-.upload-btn {
-    background: white;
-    border: 1px solid #3b82f6;
-    padding: 6px 16px;
-    font-size: 12px;
-    cursor: pointer;
-    border-radius: 5px;
-    transition: 0.2s;
-    color: #3b82f6;
-}
-
-.upload-btn:hover {
-    background: #3b82f6;
-    color: white;
-}
+/* list-item-del-btn, char-remove-btn and upload-btn replaced by .danger or .primary-btn in markup. */
 
 .resize-handle:hover {
     background: #3b82f6;
@@ -986,7 +1041,7 @@ textarea {
 
 .overlay-props-panel {
     width: 240px;
-    background: #f9fafb;
+    background: var(--hover-bg);
     border-left: 1px solid var(--border);
     display: flex;
     flex-direction: column;
@@ -1038,7 +1093,7 @@ textarea {
 .film-frame-add {
     min-width: 120px;
     height: 120px;
-    background: #f9fafb;
+    background: var(--hover-bg);
     border: 2px dashed #d1d5db;
     border-radius: 6px;
     display: flex;
@@ -1047,12 +1102,12 @@ textarea {
     cursor: pointer;
     transition: all 0.2s;
     margin: 10px;
-    color: #9ca3af;
+    color: var(--text-muted);
     font-size: 24px;
 }
 
 .film-frame-add:hover {
-    background: #eff6ff;
+    background: var(--selected-bg);
     border-color: #3b82f6;
     color: #3b82f6;
 }
@@ -1070,4 +1125,110 @@ textarea {
     top: 50%;
     left: 50%;
     transform: translate(-50%, -50%);
+}
+
+.settings-layout {
+    display: flex;
+    height: 450px;
+    font-size: 14px;
+}
+
+.settings-sidebar {
+    width: 160px;
+    background: var(--hover-bg);
+    border-right: 1px solid var(--border);
+    padding: 10px 0;
+    display: flex;
+    flex-direction: column;
+}
+
+.settings-nav-item {
+    padding: 10px 20px;
+    cursor: pointer;
+    color: var(--text-main);
+    border-left: 3px solid transparent;
+    transition: background 0.2s;
+}
+
+.settings-nav-item:hover {
+    background: var(--bg-app);
+}
+
+.settings-nav-item.active {
+    background: var(--bg-panel);
+    border-left-color: var(--primary);
+    font-weight: 600;
+    color: var(--primary);
+}
+
+.settings-content {
+    flex: 1;
+    padding: 20px;
+    overflow-y: auto;
+}
+
+.settings-panel {
+    display: none;
+}
+
+.settings-panel.active {
+    display: block;
+    animation: fadeIn 0.2s;
+}
+
+.settings-group {
+    margin-bottom: 25px;
+    border-bottom: 1px solid var(--border);
+    padding-bottom: 15px;
+}
+
+.settings-group:last-child {
+    border-bottom: none;
+}
+
+.settings-group h4 {
+    margin: 0 0 15px 0;
+    font-size: 13px;
+    text-transform: uppercase;
+    color: var(--text-muted);
+    letter-spacing: 0.5px;
+}
+
+.setting-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 12px;
+}
+
+.setting-row label {
+    color: var(--text-main);
+}
+
+.setting-row select,
+.setting-row input[type="text"],
+.setting-row input[type="number"] {
+    width: 140px;
+    padding: 6px;
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    font-size: 13px;
+    background-color: var(--bg-panel);
+    color: var(--text-main);
+}
+
+.setting-row input[type="checkbox"] {
+    transform: scale(1.2);
+    accent-color: var(--primary);
+}
+
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(5px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
 }

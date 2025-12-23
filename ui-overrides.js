@@ -77,13 +77,13 @@
       <div class="modal-box" style="max-width:400px;">
         <div class="modal-header">
           <h3 id="uiModalTitle">Title</h3>
-          <button class="close-btn" id="uiModalClose">&times;</button>
+          <button class="primary-btn" id="uiModalClose">&times;</button>
         </div>
         <div class="modal-body">
           <p id="uiModalMessage" style="margin-bottom:15px; color:#555;"></p>
           <div id="uiModalContent"></div>
           <div class="ui-modal-actions">
-            <button class="text-btn" id="uiModalCancel">Cancel</button>
+            <button class="primary-btn" id="uiModalCancel">Cancel</button>
             <button class="primary-btn" id="uiModalConfirm">Confirm</button>
           </div>
         </div>
