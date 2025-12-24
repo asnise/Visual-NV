@@ -69,7 +69,8 @@ function applyEffects() {
 
   const stage = document.getElementById("visualStage");
   if (stage) {
-    stage.style.background = "";
+    // stage.style.background = ""; // Don't wipe everything, main.js handles the image
+
     if (appSettings.stageBackground === "white") {
       stage.style.backgroundColor = "white";
     } else if (appSettings.stageBackground === "black") {
@@ -97,9 +98,12 @@ function applyEffects() {
       style.textContent = `* { transition: none !important; animation: none !important; }`;
       document.head.appendChild(style);
     }
-  } else {
-    const el = document.getElementById("no-transitions-style");
     if (el) el.remove();
+  }
+
+  // Refreshes the frame content (background image) if the function exists
+  if (typeof renderStage === "function") {
+    renderStage();
   }
 }
 
@@ -114,7 +118,7 @@ function resetSettings() {
     };
     try {
       localStorage.removeItem("vnEditorSettings");
-    } catch (e) {}
+    } catch (e) { }
 
     openSettingsModal();
     applyEffects();

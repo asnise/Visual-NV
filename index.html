@@ -21,11 +21,11 @@
                     <button onclick="
                                 document.getElementById('importInput').click()
                             ">
-                        Import Project...
+                        Open Project...
                     </button>
                     <button onclick="exportJSON()">Export Project</button>
                     <button onclick="saveJSON()">Save Project</button>
-                    <input type="file" id="importInput" style="display: none" accept=".json"
+                    <input type="file" id="importInput" style="display: none" accept=".json,.vns"
                         onchange="importJSON(event)" />
                 </div>
             </div>
@@ -98,7 +98,7 @@
         </div>
 
         <div class="stage-area">
-            <div class="stage-wrapper">
+            <div class="stage-wrapper" id="stageWrapper">
                 <div id="visualStage" class="visual-stage">
                     <div class="slot-zone" data-slot="0" ondrop="drop(event)" ondragover="allowDrop(event)"></div>
                     <div class="slot-zone" data-slot="1" ondrop="drop(event)" ondragover="allowDrop(event)"></div>
@@ -113,6 +113,13 @@
                             Dialogue text...
                         </div>
                     </div>
+                </div>
+
+                <div class="stage-controls">
+                    <button class="icon-btn" onclick="resetStageView()" title="Reset View">
+                        <span style="font-size:14px;">⟲</span>
+                    </button>
+                    <span id="stageZoomLabel">100%</span>
                 </div>
             </div>
 
@@ -132,7 +139,7 @@
             <div class="modal-header">
                 <h3>Character Setup & Layers</h3>
                 <button onclick="closeModal('characterModal')">
-                    Close
+                    &times;
                 </button>
             </div>
             <div class="modal-body">
@@ -157,7 +164,7 @@
             <div class="modal-header">
                 <h3>Manage Chapters</h3>
                 <button onclick="closeModal('chapterModal')">
-                    Close
+                    &times;
                 </button>
             </div>
             <div class="modal-body" id="chapterMgmtList"></div>
@@ -173,9 +180,7 @@
         <div class="modal-box">
             <div class="modal-header">
                 <h3>Background Assets</h3>
-                <button onclick="closeModal('assetsModal')">
-                    Close
-                </button>
+                <button onclick="closeModal('assetsModal')">&times;</button>
             </div>
             <div class="modal-body">
                 <button class="primary-btn" onclick="document.getElementById('bgFileInput').click()">
@@ -196,8 +201,8 @@
         <div class="modal-box" style="width: 800px; max-width: 90vw">
             <div class="modal-header">
                 <h3>Settings</h3>
-                <button onclick="closeModal('settingsModal')" style="margin: 10px">
-                    Close
+                <button onclick="closeModal('settingsModal')">
+                    &times;
                 </button>
             </div>
 
@@ -277,7 +282,7 @@
                 </div>
             </div>
             <div class="modal-footer">
-                <button onclick="closeModal('settingsModal')">
+                <button class="danger" onclick="closeModal('settingsModal')" style="margin-right: 15px">
                     Cancel
                 </button>
                 <button class="primary-btn" onclick="saveAndApplySettings()">
@@ -292,7 +297,7 @@
             <div class="modal-header">
                 <h3>Preview Player</h3>
                 <button onclick="closeModal('previewModal')">
-                    Close
+                    &times;
                 </button>
             </div>
             <div class="preview-viewport" id="pViewport" style="position: relative; aspect-ratio: 16/9">
@@ -377,12 +382,10 @@
             </div>
 
             <div class="overlay-props-panel">
-                <div class="modal-header" style="
-                            padding: 15px;
-                        ">
+                <div class="modal-header" style="padding: 15px">
                     <h3 style="font-size: 14px; margin: 0">Properties</h3>
                     <button onclick="closeModal('overlayModal')">
-                        Close
+                        &times;
                     </button>
                 </div>
                 <div style="padding: 15px; flex: 1; overflow-y: auto">
@@ -427,7 +430,7 @@
             <div class="modal-header">
                 <h3>Add New Character</h3>
                 <button onclick="closeModal('addCharModal')">
-                    Close
+                    &times;
                 </button>
             </div>
             <div class="modal-body">
@@ -451,10 +454,9 @@
     <div id="slideContextMenu" class="context-menu">
         <button onclick="contextMenuAction('copy')">Copy</button>
         <button onclick="contextMenuAction('cut')">Cut</button>
+        <button onclick="contextMenuAction('paste')">Paste</button>
         <button onclick="contextMenuAction('duplicate')">Duplicate</button>
-        <button class="danger" onclick="contextMenuAction('remove')">
-            Remove
-        </button>
+        <button onclick="contextMenuAction('remove')" style="color: #fa2323;">Remove</button>
     </div>
 
     <script src="settings.js"></script>

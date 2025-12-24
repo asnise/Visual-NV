@@ -316,28 +316,50 @@
   }
 
   const originalImportJSON = window.importJSON;
-  window.importJSON = function (e) {
+  window.importJSON = async function (e) {
     const file = e.target.files[0];
     if (!file) return;
-    const reader = new FileReader();
-    reader.onload = (ev) => {
-      try {
-        const imported = JSON.parse(ev.target.result);
-        if (imported.characters && imported.chapters) {
-          project = imported;
-          if (!project.assets) project.assets = { backgrounds: [] };
-          activeChapterId = project.chapters[0].id;
-          loadChapter(activeChapterId);
-          renderCastPalette();
-          showToast("Project loaded successfully", "success");
+
+    try {
+      let imported;
+      // Check for .vns or attempt decompression if desired, mirroring main.js logic
+      if (file.name.endsWith('.vns') || (file.name.endsWith('.json') && file.size > 0)) {
+        if (window.DecompressionStream) {
+          try {
+            const ds = new DecompressionStream("gzip");
+            const stream = file.stream().pipeThrough(ds);
+            const decompressedBlob = await new Response(stream).blob();
+            const text = await decompressedBlob.text();
+            imported = JSON.parse(text);
+          } catch (err) {
+            // Fallback to text if decompression fails
+            const text = await file.text();
+            imported = JSON.parse(text);
+          }
         } else {
-          showToast("Invalid project file format", "error");
+          const text = await file.text();
+          imported = JSON.parse(text);
         }
-      } catch {
-        showToast("Error parsing project file", "error");
+      } else {
+        // Standard text read
+        const text = await file.text();
+        imported = JSON.parse(text);
       }
-    };
-    reader.readAsText(file);
+
+      if (imported.characters && imported.chapters) {
+        project = imported;
+        if (!project.assets) project.assets = { backgrounds: [] };
+        activeChapterId = project.chapters[0].id;
+        loadChapter(activeChapterId);
+        renderCastPalette();
+        showToast("Project loaded successfully", "success");
+      } else {
+        showToast("Invalid project file format", "error");
+      }
+    } catch (err) {
+      console.error(err);
+      showToast("Error parsing project file", "error");
+    }
     e.target.value = "";
   };
 })();

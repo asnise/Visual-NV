@@ -195,13 +195,11 @@ label.primary-btn:hover {
     color: #fff;
 }
 
-.primary-btn:active {
-    transform: translateY(1px);
-}
 .primary-btn:focus {
     outline: none;
     box-shadow: 0 0 0 5px rgba(59, 130, 246, 0.12);
 }
+
 .primary-btn.small {
     padding: 4px 8px;
     font-size: 12px;
@@ -231,6 +229,7 @@ label.danger:hover {
     background: var(--danger);
     color: white;
 }
+
 .danger.small {
     padding: 4px 8px;
     font-size: 12px;
@@ -261,6 +260,7 @@ button[disabled],
 [data-theme="dark"] label.danger {
     border-color: rgba(255, 255, 255, 0.06);
 }
+
 /* Note: Only `.primary-btn` and `.danger` button types are supported. */
 
 .workspace {
@@ -346,6 +346,9 @@ button[disabled],
     justify-content: center;
     overflow: hidden;
     padding: 20px;
+    position: relative;
+    background: #dfdfdf;
+    /* darker bg to see bounds */
 }
 
 .visual-stage {
@@ -362,6 +365,42 @@ button[disabled],
     background-repeat: no-repeat;
     transition: background-image 0.6s ease;
     overflow: hidden;
+    transform-origin: center center;
+    /* Transformation handled by JS */
+}
+
+.stage-controls {
+    position: absolute;
+    bottom: 20px;
+    right: 20px;
+    background: rgba(0, 0, 0, 0.6);
+    backdrop-filter: blur(4px);
+    padding: 5px 10px;
+    border-radius: 20px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    color: white;
+    font-size: 12px;
+    z-index: 100;
+}
+
+.icon-btn {
+    background: transparent;
+    border: none;
+    color: white;
+    padding: 4px;
+    border-radius: 50%;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 24px;
+    height: 24px;
+}
+
+.icon-btn:hover {
+    background: rgba(255, 255, 255, 0.2);
 }
 
 .slot-zone {
@@ -596,6 +635,7 @@ button[disabled],
 .context-menu .danger {
     color: #b91c1c;
 }
+
 /* delete-slide-btn removed; use .danger instead */
 
 .asset-item {
@@ -1063,6 +1103,7 @@ textarea {
     from {
         opacity: 0;
     }
+
     to {
         opacity: 1;
     }
@@ -1073,6 +1114,7 @@ textarea {
         opacity: 0;
         transform: translateX(-100px);
     }
+
     to {
         opacity: 1;
         transform: translateX(0);
@@ -1084,6 +1126,7 @@ textarea {
         opacity: 0;
         transform: translateX(100px);
     }
+
     to {
         opacity: 1;
         transform: translateX(0);
@@ -1227,6 +1270,7 @@ textarea {
         opacity: 0;
         transform: translateY(5px);
     }
+
     to {
         opacity: 1;
         transform: translateY(0);

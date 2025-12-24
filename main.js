@@ -65,6 +65,15 @@ let editorState = {
   startY: 0,
 };
 
+let stageView = {
+  scale: 1,
+  x: 0,
+  y: 0,
+  isPanning: false,
+  startX: 0,
+  startY: 0,
+};
+
 const OVERLAY_BASE_SIZE = 60;
 
 function getChapter() {
@@ -92,6 +101,8 @@ function createFrameFromTemplate(templateFrame) {
   clone.slots.forEach((s) => {
     if (s) s.anim = "none";
   });
+  if (!clone.choices) clone.choices = [];
+  if (!clone.attributes) clone.attributes = {};
   return clone;
 }
 
@@ -173,11 +184,11 @@ function addFrame() {
   const template = chapter.frames.length
     ? chapter.frames[chapter.frames.length - 1]
     : {
-        text: "",
-        speakerId: "",
-        background: "none",
-        slots: [null, null, null, null],
-      };
+      text: "",
+      speakerId: "",
+      background: "none",
+      slots: [null, null, null, null],
+    };
   chapter.frames.push(createFrameFromTemplate(template));
   switchFrame(chapter.frames.length - 1);
 }
@@ -201,6 +212,68 @@ function updateText(val) {
   getFrame().text = val;
   renderStage();
   renderFilmstrip();
+}
+
+function updateFrameChoice(index, key, val) {
+  const frame = getFrame();
+  if (!frame.choices) frame.choices = [];
+  if (frame.choices[index]) {
+    frame.choices[index][key] = val;
+    // Re-render handled by input losing focus or explicit call? 
+    // Inspector inputs use oninput/onchange. We don't need full re-render for text input usually.
+  }
+}
+
+function addFrameChoice() {
+  const frame = getFrame();
+  if (!frame.choices) frame.choices = [];
+  frame.choices.push({ text: "New Choice", target: "" });
+  renderInspector();
+}
+
+function removeFrameChoice(index) {
+  const frame = getFrame();
+  if (frame.choices) {
+    frame.choices.splice(index, 1);
+    renderInspector();
+  }
+}
+
+function updateFrameAttribute(key, val, isKey = false, oldKey = null) {
+  const frame = getFrame();
+  if (!frame.attributes) frame.attributes = {};
+
+  if (isKey) {
+    // Renaming a key
+    if (key !== oldKey) {
+      const value = frame.attributes[oldKey];
+      delete frame.attributes[oldKey];
+      frame.attributes[key] = value;
+      renderInspector();
+    }
+  } else {
+    // Updating value
+    frame.attributes[key] = val;
+  }
+}
+
+
+function addFrameAttribute() {
+  const frame = getFrame();
+  if (!frame.attributes) frame.attributes = {};
+  // Find a unique key
+  let counter = 1;
+  while (frame.attributes[`Key${counter}`]) counter++;
+  frame.attributes[`Key${counter}`] = "Value";
+  renderInspector();
+}
+
+function deleteFrameAttribute(key) {
+  const frame = getFrame();
+  if (frame.attributes) {
+    delete frame.attributes[key];
+    renderInspector();
+  }
 }
 
 function updateSpeaker(val) {
@@ -527,7 +600,44 @@ function renderInspector() {
     container.innerHTML = `
       <div class="form-group"><label>Speaker</label><select onchange="updateSpeaker(this.value)"><option value="">(Narrator)</option>${speakerOpts}</select></div>
       <div class="form-group"><label>Dialogue Text</label><textarea oninput="updateText(this.value)">${frame.text || ""}</textarea></div>
-      <div class="form-group"><label>Background</label><select onchange="updateBackground(this.value)">${bgOpts}</select><button class="primary-btn" onclick="openModal('assetsModal')">Manage</button></div>
+      
+      <div class="form-group" style="border-top:1px solid #444; margin-top:10px; padding-top:10px;">
+          <label>Choices</label>
+          ${(frame.choices || []).map((c, i) => `
+              <div style="background: rgba(0,0,0,0.1); padding: 8px; border-radius: 4px; margin-bottom: 8px; border: 1px solid var(--border);">
+                  <div style="margin-bottom: 4px;">
+                      <label style="font-size: 11px; opacity: 0.7;">Choice Text</label>
+                      <input class="inspector-input" type="text" value="${c.text}" onchange="updateFrameChoice(${i}, 'text', this.value)" style="width: 100%; box-sizing: border-box;">
+                  </div>
+                  <div style="margin-bottom: 4px;">
+                      <label style="font-size: 11px; opacity: 0.7;">Target ID</label>
+                      <input class="inspector-input" type="text" value="${c.target}" onchange="updateFrameChoice(${i}, 'target', this.value)" style="width: 100%; box-sizing: border-box;">
+                  </div>
+                  <button class="danger small" onclick="removeFrameChoice(${i})" style="width: 100%; margin-top: 4px;">Remove</button>
+              </div>
+          `).join('')}
+          <button class="primary-btn small" onclick="addFrameChoice()" style="width: 100%;">+ Add Choice</button>
+      </div>
+
+      <div class="form-group" style="border-top:1px solid #444; margin-top:10px; padding-top:10px;">
+          <label>Attributes</label>
+          ${Object.entries(frame.attributes || {}).map(([key, val]) => `
+              <div style="background: rgba(0,0,0,0.1); padding: 8px; border-radius: 4px; margin-bottom: 8px; border: 1px solid var(--border);">
+                  <div style="margin-bottom: 4px;">
+                      <label style="font-size: 11px; opacity: 0.7;">Key</label>
+                      <input class="inspector-input" type="text" value="${key}" onchange="updateFrameAttribute(this.value, null, true, '${key}')" style="width: 100%; box-sizing: border-box;">
+                  </div>
+                  <div style="margin-bottom: 4px;">
+                      <label style="font-size: 11px; opacity: 0.7;">Value</label>
+                      <input class="inspector-input" type="text" value="${val}" onchange="updateFrameAttribute('${key}', this.value)" style="width: 100%; box-sizing: border-box;">
+                  </div>
+                  <button class="danger small" onclick="deleteFrameAttribute('${key}')" style="width: 100%; margin-top: 4px;">Remove</button>
+              </div>
+          `).join('')}
+          <button class="primary-btn small" onclick="addFrameAttribute()" style="width: 100%;">+ Add Attribute</button>
+      </div>
+
+      <div class="form-group" style="border-top:1px solid #444; margin-top:10px; padding-top:10px;"><label>Background</label><select onchange="updateBackground(this.value)">${bgOpts}</select><button class="primary-btn" onclick="openModal('assetsModal')">Manage</button></div>
       <button class="danger" onclick="deleteFrame()">Delete Slide</button>`;
     return;
   }
@@ -850,7 +960,7 @@ function onFrameDrop(e) {
   );
 }
 
-function onFrameDragEnd(e) {}
+function onFrameDragEnd(e) { }
 
 let contextFrameIndex = null;
 
@@ -871,10 +981,21 @@ function onFrameContextMenu(e) {
   showSlideContextMenu(e.clientX, e.clientY);
 }
 
+function pasteFrameAt(idx) {
+  if (!frameClipboard) {
+    if (typeof showToast === 'function') showToast("Nothing to paste", "info");
+    return;
+  }
+  const cloned = createFrameFromTemplate(frameClipboard);
+  getChapter().frames.splice(idx + 1, 0, cloned);
+  switchFrame(idx + 1);
+}
+
 function contextMenuAction(act) {
   if (contextFrameIndex === null) return;
   if (act === "copy") copyFrameAt(contextFrameIndex);
   if (act === "cut") cutFrameAt(contextFrameIndex);
+  if (act === "paste") pasteFrameAt(contextFrameIndex);
   if (act === "duplicate") duplicateFrameAt(contextFrameIndex);
   if (act === "remove") removeFrameAt(contextFrameIndex);
   hideSlideContextMenu();
@@ -886,14 +1007,68 @@ function readFileAsDataURL(file, cb) {
   reader.readAsDataURL(file);
 }
 
-function saveJSON() {
-  const blob = new Blob([JSON.stringify(project, null, 2)], {
-    type: "application/json",
+async function optimizeImage(dataUrl, quality = 0.8) {
+  return new Promise((resolve) => {
+    if (!dataUrl || !dataUrl.startsWith("data:image")) {
+      resolve(dataUrl);
+      return;
+    }
+    const img = new Image();
+    img.onload = () => {
+      const canvas = document.createElement("canvas");
+      canvas.width = img.width;
+      canvas.height = img.height;
+      const ctx = canvas.getContext("2d");
+      ctx.drawImage(img, 0, 0);
+      resolve(canvas.toDataURL("image/webp", quality));
+    };
+    img.onerror = () => resolve(dataUrl); // Fallback
+    img.src = dataUrl;
   });
-  const a = document.createElement("a");
-  a.href = URL.createObjectURL(blob);
-  a.download = "vn-project-save.json";
-  a.click();
+}
+
+async function optimizeProjectImages() {
+  if (typeof showToast === "function") showToast("Optimizing images...", "info");
+
+  // Optimize Characters
+  for (const char of project.characters) {
+    for (const body of char.bodies) {
+      if (body.url) body.url = await optimizeImage(body.url);
+    }
+    for (const face of char.faces) {
+      if (face.url) face.url = await optimizeImage(face.url);
+    }
+  }
+
+  // Optimize Backgrounds
+  for (const bg of project.assets.backgrounds) {
+    if (bg.url) bg.url = await optimizeImage(bg.url);
+  }
+}
+
+async function saveJSON() {
+  await optimizeProjectImages(); // Compress images before saving
+
+  const jsonString = JSON.stringify(project); // No whitespace for smaller size
+
+  if (window.CompressionStream) {
+    // Use GZIP compression
+    const stream = new Blob([jsonString]).stream();
+    const compressedStream = stream.pipeThrough(new CompressionStream("gzip"));
+    const compressedBlob = await new Response(compressedStream).blob();
+
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(compressedBlob);
+    a.download = "vn-project-save.vns"; // .vns for Compressed Visual Novel Save
+    a.click();
+  } else {
+    // Fallback
+    const blob = new Blob([jsonString], { type: "application/json" });
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = "vn-project-save.json";
+    a.click();
+  }
 }
 
 function exportJSON() {
@@ -920,28 +1095,51 @@ function exportJSON() {
   a.click();
 }
 
-function importJSON(e) {
+async function importJSON(e) {
   const file = e.target.files[0];
   if (!file) return;
-  const reader = new FileReader();
-  reader.onload = (ev) => {
-    try {
-      const imported = JSON.parse(ev.target.result);
-      if (imported.characters && imported.chapters) {
-        project = imported;
-        if (!project.assets)
-          project.assets = {
-            backgrounds: [],
-          };
-        activeChapterId = project.chapters[0].id;
-        loadChapter(activeChapterId);
-        renderCastPalette();
-      } else alert("Invalid format");
-    } catch {
-      alert("Parse error");
+
+  try {
+    let imported;
+    if (file.name.endsWith('.vns') || (file.name.endsWith('.json') && file.size > 0)) {
+      // Attempt to decompress first if it's .vns OR we want to try
+      // If browser supports DecompressionStream
+      if (window.DecompressionStream) {
+        try {
+          const ds = new DecompressionStream("gzip");
+          const stream = file.stream().pipeThrough(ds);
+          const decompressedBlob = await new Response(stream).blob();
+          const text = await decompressedBlob.text();
+          imported = JSON.parse(text);
+        } catch (err) {
+          // Decompression failed, maybe it's plain text JSON
+          // Console.log("Decompression failed, trying plain text", err);
+          const text = await file.text();
+          imported = JSON.parse(text);
+        }
+      } else {
+        const text = await file.text();
+        imported = JSON.parse(text);
+      }
+    } else {
+      const text = await file.text();
+      imported = JSON.parse(text);
     }
-  };
-  reader.readAsText(file);
+
+    if (imported.characters && imported.chapters) {
+      project = imported;
+      if (!project.assets)
+        project.assets = {
+          backgrounds: [],
+        };
+      activeChapterId = project.chapters[0].id;
+      loadChapter(activeChapterId);
+      renderCastPalette();
+    } else alert("Invalid format");
+  } catch (err) {
+    console.error(err);
+    alert("Parse error");
+  }
   e.target.value = "";
 }
 
@@ -1183,6 +1381,138 @@ function init() {
   if (typeof initSettingsModal === "function") {
     initSettingsModal();
   }
+  initStageViewEvents();
+}
+
+function initStageViewEvents() {
+  const wrapper = document.getElementById("stageWrapper");
+  const stage = document.getElementById("visualStage");
+
+  wrapper.addEventListener("wheel", (e) => {
+    // Zoom with wheel
+    // If ctrl key is pressed or just default behavior? 
+    // Let's make it always zoom for now as that's standard in canvas apps
+    e.preventDefault();
+    const delta = e.deltaY > 0 ? -0.1 : 0.1;
+    let newScale = stageView.scale + delta;
+    // Clamp scale
+    newScale = Math.max(0.1, Math.min(5, newScale));
+    stageView.scale = newScale;
+    updateStageTransform();
+  }, { passive: false });
+
+  wrapper.addEventListener("mousedown", (e) => {
+    // Middle click (button 1) or Space + Left Click (button 0 + space)
+    if (e.button === 1 || (e.button === 0 && e.code === "Space")) {
+      e.preventDefault();
+      stageView.isPanning = true;
+      stageView.startX = e.clientX - stageView.x;
+      stageView.startY = e.clientY - stageView.y;
+      wrapper.style.cursor = "grabbing";
+    }
+  });
+
+  window.addEventListener("mousemove", (e) => {
+    if (!stageView.isPanning) return;
+    e.preventDefault();
+    stageView.x = e.clientX - stageView.startX;
+    stageView.y = e.clientY - stageView.startY;
+    updateStageTransform();
+  });
+
+  window.addEventListener("mouseup", () => {
+    if (stageView.isPanning) {
+      stageView.isPanning = false;
+      wrapper.style.cursor = "default";
+    }
+  });
+
+  // Also handle Space key for temporary cursor change
+  window.addEventListener("keydown", (e) => {
+    if (e.code === "Space" && !e.repeat && document.activeElement === document.body) {
+      wrapper.style.cursor = "grab";
+    }
+  });
+
+  window.addEventListener("keyup", (e) => {
+    if (e.code === "Space") {
+      wrapper.style.cursor = "default";
+    }
+  });
+}
+
+function updateStageTransform() {
+  const stage = document.getElementById("visualStage");
+  const wrapper = document.getElementById("stageWrapper");
+
+  // Strict limit: Center of stage cannot leave the viewport
+  if (stage && wrapper) {
+    const wrapperRect = wrapper.getBoundingClientRect();
+    const stageRect = stage.getBoundingClientRect();
+
+    // We want to limit the translation (x,y) so that the stage edges don't go too far
+    // Current transform: translate(x, y) scale(s)
+
+    // Calculate allowable range
+    // If stage is larger than wrapper, we can pan to edges?
+    // Actually, simpler user request: "limit translate X,Y" usually means "clamp it so I can't lose it"
+    // Let's make it so at least 100px of the stage is always visible.
+
+    const VISIBLE_MARGIN = 100 * stageView.scale;
+
+    const minX = - (900 * stageView.scale) / 2 - wrapperRect.width / 2 + VISIBLE_MARGIN;
+    const maxX = (900 * stageView.scale) / 2 + wrapperRect.width / 2 - VISIBLE_MARGIN;
+
+    // Wait, the previous logic (Center clamped to Wrapper Half-Size) ensures the center stays in view. 
+    // Maybe they want to clamp it so the EDGE aligns with the wrapper if possible? 
+    // Standard "Canvas" behavior: 
+    // If zoomed IN: Allow panning until edge hits viewport edge.
+    // If zoomed OUT: Allow centering?
+
+    // Let's try the "Center must be within Wrapper Bounds" logic again but slightly tighter?
+    // The user said "visualStage limit translate X,Y" which is very specific about X and Y.
+    // I will clamp X and Y to strictly keep the center inside the wrapper, which is what I had,
+    // but maybe they faced an issue where it was still too loose.
+
+    // Let's implement a "Box Containment" logic.
+    // X and Y are translation offsets from CENTER.
+
+    const scaledWidth = 900 * stageView.scale;
+    const scaledHeight = 550 * stageView.scale;
+
+    // Range of motion for X
+    let xRange = 0;
+    if (scaledWidth > wrapperRect.width) {
+      xRange = (scaledWidth - wrapperRect.width) / 2;
+    } else {
+      // If stage is smaller, keep it centered? Or allow free movement?
+      // Usually centered is nicer, but maybe they want to pan?
+      xRange = (wrapperRect.width - scaledWidth) / 2;
+    }
+
+    // Because we translate from center, we need to be careful.
+    // Let's stick to the "Center in Viewport" rule but stricter.
+    // Center of Wrapper = 0,0 relative.
+
+    const limitX = Math.max(0, (scaledWidth / 2 + wrapperRect.width / 2) - 50); // Keep 50px overlapping
+    const limitY = Math.max(0, (scaledHeight / 2 + wrapperRect.height / 2) - 50);
+
+    stageView.x = Math.max(-limitX, Math.min(limitX, stageView.x));
+    stageView.y = Math.max(-limitY, Math.min(limitY, stageView.y));
+  }
+
+  stage.style.transform = `translate(${stageView.x}px, ${stageView.y}px) scale(${stageView.scale})`;
+
+  // Update label
+  const label = document.getElementById("stageZoomLabel");
+  if (label) label.textContent = Math.round(stageView.scale * 100) + "%";
+}
+
+function resetStageView() {
+  stageView.scale = 1;
+  stageView.x = 0;
+  stageView.y = 0;
+  updateStageTransform();
 }
 
 init();
