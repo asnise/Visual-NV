@@ -515,6 +515,39 @@ button[disabled],
     padding: 0 0 30px 0;
 }
 
+.filmstrip-tabs {
+    display: flex;
+    gap: 2px;
+    background: var(--bg-secondary);
+    padding: 4px 10px 0 10px;
+    border-bottom: 1px solid var(--border);
+}
+
+.filmstrip-tab {
+    padding: 6px 16px;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--text-muted);
+    background: transparent;
+    border: none;
+    border-radius: 6px 6px 0 0;
+    cursor: pointer;
+    transition: all 0.2s;
+    position: relative;
+    user-select: none;
+}
+
+.filmstrip-tab:hover {
+    background: var(--hover-bg);
+    color: var(--text-main);
+}
+
+.filmstrip-tab.active {
+    background: var(--bg-panel);
+    color: var(--text-main);
+    border-bottom: 2px solid var(--primary);
+}
+
 .filmstrip-reel {
     flex: 1;
     display: flex;
@@ -1135,7 +1168,8 @@ textarea {
 
 .film-frame-add {
     min-width: 120px;
-    height: 120px;
+    max-width: 120px; /* Matches film-frame width constraint */
+    height: 100%; /* Matches film-frame height to fill the container */
     background: var(--hover-bg);
     border: 2px dashed #d1d5db;
     border-radius: 6px;
@@ -1144,7 +1178,7 @@ textarea {
     justify-content: center;
     cursor: pointer;
     transition: all 0.2s;
-    margin: 10px;
+    /* margin: 10px; REMOVED: Spacing is now handled by the parent's gap */
     color: var(--text-muted);
     font-size: 24px;
 }

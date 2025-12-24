@@ -50,6 +50,7 @@ let selectedSlotIndex = -1;
 let editingCharId = null;
 let editingOverlayIdx = -1;
 let frameClipboard = null;
+let activeFilmstripTab = "main"; // "main" or "instant"
 
 let isDragging = false;
 let isResizing = false;
@@ -103,6 +104,10 @@ function createFrameFromTemplate(templateFrame) {
   });
   if (!clone.choices) clone.choices = [];
   if (!clone.attributes) clone.attributes = {};
+  if (!clone.frameType) clone.frameType = "main";
+  if (clone.frameType === "instant" && !clone.returnToFrame) {
+    clone.returnToFrame = "continue";
+  }
   return clone;
 }
 
@@ -184,12 +189,17 @@ function addFrame() {
   const template = chapter.frames.length
     ? chapter.frames[chapter.frames.length - 1]
     : {
-      text: "",
-      speakerId: "",
-      background: "none",
-      slots: [null, null, null, null],
-    };
-  chapter.frames.push(createFrameFromTemplate(template));
+        text: "",
+        speakerId: "",
+        background: "none",
+        slots: [null, null, null, null],
+      };
+  const newFrame = createFrameFromTemplate(template);
+  newFrame.frameType = activeFilmstripTab;
+  if (activeFilmstripTab === "instant") {
+    newFrame.returnToFrame = "continue";
+  }
+  chapter.frames.push(newFrame);
   switchFrame(chapter.frames.length - 1);
 }
 
@@ -219,15 +229,14 @@ function updateFrameChoice(index, key, val) {
   if (!frame.choices) frame.choices = [];
   if (frame.choices[index]) {
     frame.choices[index][key] = val;
-    // Re-render handled by input losing focus or explicit call? 
-    // Inspector inputs use oninput/onchange. We don't need full re-render for text input usually.
+    if (key === "type") renderInspector();
   }
 }
 
 function addFrameChoice() {
   const frame = getFrame();
   if (!frame.choices) frame.choices = [];
-  frame.choices.push({ text: "New Choice", target: "" });
+  frame.choices.push({ type: "jump", text: "New Choice", target: "" });
   renderInspector();
 }
 
@@ -239,39 +248,23 @@ function removeFrameChoice(index) {
   }
 }
 
-function updateFrameAttribute(key, val, isKey = false, oldKey = null) {
+function updateExecuteFunction(index, val) {
   const frame = getFrame();
-  if (!frame.attributes) frame.attributes = {};
-
-  if (isKey) {
-    // Renaming a key
-    if (key !== oldKey) {
-      const value = frame.attributes[oldKey];
-      delete frame.attributes[oldKey];
-      frame.attributes[key] = value;
-      renderInspector();
-    }
-  } else {
-    // Updating value
-    frame.attributes[key] = val;
-  }
+  if (!frame.executeFunctions) frame.executeFunctions = [];
+  frame.executeFunctions[index] = val;
 }
 
-
-function addFrameAttribute() {
+function addExecuteFunction() {
   const frame = getFrame();
-  if (!frame.attributes) frame.attributes = {};
-  // Find a unique key
-  let counter = 1;
-  while (frame.attributes[`Key${counter}`]) counter++;
-  frame.attributes[`Key${counter}`] = "Value";
+  if (!frame.executeFunctions) frame.executeFunctions = [];
+  frame.executeFunctions.push("Function()");
   renderInspector();
 }
 
-function deleteFrameAttribute(key) {
+function deleteExecuteFunction(index) {
   const frame = getFrame();
-  if (frame.attributes) {
-    delete frame.attributes[key];
+  if (frame.executeFunctions) {
+    frame.executeFunctions.splice(index, 1);
     renderInspector();
   }
 }
@@ -284,6 +277,31 @@ function updateSpeaker(val) {
 function updateBackground(val) {
   getFrame().background = val;
   renderStage();
+}
+
+function switchFilmstripTab(tab) {
+  activeFilmstripTab = tab;
+  document.querySelectorAll(".filmstrip-tab").forEach((t) => {
+    t.classList.toggle("active", t.dataset.tab === tab);
+  });
+  renderFilmstrip();
+  renderInspector();
+}
+
+function updateFrameType(type) {
+  const frame = getFrame();
+  frame.frameType = type;
+  if (type === "instant" && !frame.returnToFrame) {
+    frame.returnToFrame = "continue";
+  }
+  renderInspector();
+  renderFilmstrip();
+}
+
+function updateReturnToFrame(value) {
+  const frame = getFrame();
+  frame.returnToFrame = value;
+  renderInspector();
 }
 
 function loadChapter(id) {
@@ -533,7 +551,8 @@ function renderStage() {
       closeBtn.textContent = "Remove";
       // Use destructive button style and inline layout to preserve position
       closeBtn.className = "danger";
-      closeBtn.style.cssText = "position:absolute;top:8px;right:8px;padding:4px 8px;border-radius:5px;font-size:12px;line-height:1;text-align:center;cursor:pointer;z-index:20;background:var(--danger);color:#fff;border:1px solid var(--danger);";
+      closeBtn.style.cssText =
+        "position:absolute;top:8px;right:8px;padding:4px 8px;border-radius:5px;font-size:12px;line-height:1;text-align:center;cursor:pointer;z-index:20;background:var(--danger);color:#fff;border:1px solid var(--danger);";
       closeBtn.onclick = (e) => {
         e.stopPropagation();
         clearSlot(i);
@@ -552,8 +571,17 @@ function renderStage() {
 function renderFilmstrip() {
   const reel = document.getElementById("filmstrip");
   const chapter = getChapter();
-  let html = chapter.frames
-    .map((f, idx) => {
+
+  const visibleFrames = chapter.frames
+    .map((f, i) => ({ ...f, originalIndex: i }))
+    .filter((f) => {
+      const type = f.frameType || "main";
+      return type === activeFilmstripTab;
+    });
+
+  let html = visibleFrames
+    .map((f) => {
+      const idx = f.originalIndex;
       let dots = "";
       f.slots.forEach((s) => {
         if (s) {
@@ -582,7 +610,48 @@ function renderFilmstrip() {
 
 function renderInspector() {
   const container = document.getElementById("inspectorContent");
+
+  // Preserve expand/collapse state
+  const choicesEl = container.querySelector("#details-choices");
+  const choicesOpen = choicesEl ? choicesEl.hasAttribute("open") : true;
+
+  const execEl = container.querySelector("#details-exec");
+  const execOpen = execEl ? execEl.hasAttribute("open") : true;
+
   const frame = getFrame();
+
+  // Define Icons
+  // Icon for Expanded State (Down Arrow)
+  const iconExpanded = `
+    <svg class="icon-expanded" style="width:16px; height:16px; margin-right:5px;" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+      <path stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="m19 9-7 7-7-7"/>
+    </svg>`;
+
+  // Icon for Collapsed State (Right Arrow)
+  const iconCollapsed = `
+    <svg class="icon-collapsed" style="width:16px; height:16px; margin-right:5px;" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+      <path stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="m9 5 7 7-7 7"/>
+    </svg>`;
+
+  // Inline CSS for the toggling behavior
+  const styles = `
+    <style>
+        details > summary {
+            list-style: none;
+            cursor: pointer;
+            font-weight: 600;
+            margin-bottom: 10px;
+            user-select: none;
+            display: flex;
+            align-items: center;
+            outline: none;
+        }
+        details > summary::-webkit-details-marker { display: none; }
+
+        /* Toggle Icons based on open attribute */
+        details[open] .icon-collapsed { display: none; }
+        details:not([open]) .icon-expanded { display: none; }
+    </style>`;
 
   if (selectedSlotIndex === -1) {
     const speakerOpts = project.characters
@@ -597,48 +666,101 @@ function renderInspector() {
           `<option value="${n}" ${frame.background === n ? "selected" : ""}>${n}</option>`,
       )
       .join("");
+
+    // Instant Frame Logic
+    let instantControls = "";
+    if (activeFilmstripTab === "instant") {
+      const returnVal = frame.returnToFrame || "continue";
+      instantControls = `
+            <div class="form-group" style="background:var(--bg-secondary); padding:10px; border-radius:4px; margin-bottom:15px;">
+                <label style="color:var(--primary);">Instant Frame Action</label>
+                <div style="margin-bottom:8px;font-size:11px;color:var(--text-muted);">When dialogue finishes:</div>
+                <select onchange="updateReturnToFrame(this.value)">
+                    <option value="continue" ${returnVal === "continue" ? "selected" : ""}>Jump to Next Frame</option>
+                    <option value="return" ${returnVal === "return" ? "selected" : ""}>Return to Main Timeline</option>
+                </select>
+            </div>`;
+    }
+
     container.innerHTML = `
-      <div class="form-group"><label>Speaker</label><select onchange="updateSpeaker(this.value)"><option value="">(Narrator)</option>${speakerOpts}</select></div>
+      ${styles}
+      <div class="form-group">
+        <div style="display:flex; justify-content:space-between; align-items:center;">
+            <label>Speaker</label>
+            <span style="font-size:10px; color:var(--text-muted);">ID: ${frame.id}</span>
+        </div>
+        <select onchange="updateSpeaker(this.value)"><option value="">(Narrator)</option>${speakerOpts}</select>
+      </div>
+
       <div class="form-group"><label>Dialogue Text</label><textarea oninput="updateText(this.value)">${frame.text || ""}</textarea></div>
-      
-      <div class="form-group" style="border-top:1px solid #444; margin-top:10px; padding-top:10px;">
-          <label>Choices</label>
-          ${(frame.choices || []).map((c, i) => `
-              <div style="background: rgba(0,0,0,0.1); padding: 8px; border-radius: 4px; margin-bottom: 8px; border: 1px solid var(--border);">
+
+      ${instantControls}
+
+      <details id="details-choices" class="form-group" style="border-top:1px solid var(--border); margin-top:10px; padding-top:10px;" ${choicesOpen ? "open" : ""}>
+          <summary>
+            ${iconExpanded}
+            ${iconCollapsed}
+            Choices
+          </summary>
+          ${(frame.choices || [])
+            .map((c, i) => {
+              const type = c.type || "jump";
+              const targetLabel =
+                type === "jump" ? "Target Frame ID" : "Function Name";
+              const targetPlaceholder =
+                type === "jump" ? "Frame ID" : "myFunction()";
+              return `
+              <div style="background: rgba(0,0,0,0.05); padding: 8px; border-radius: 4px; margin-bottom: 8px; border: 1px solid var(--border);">
+                  <div style="margin-bottom: 4px;">
+                      <label style="font-size: 11px; opacity: 0.7;">Type</label>
+                      <select class="inspector-input" onchange="updateFrameChoice(${i}, 'type', this.value)" style="width: 100%; box-sizing: border-box;">
+                          <option value="jump" ${type === "jump" ? "selected" : ""}>Jump Frame</option>
+                          <option value="exec" ${type === "exec" ? "selected" : ""}>Execute Function</option>
+                      </select>
+                  </div>
                   <div style="margin-bottom: 4px;">
                       <label style="font-size: 11px; opacity: 0.7;">Choice Text</label>
                       <input class="inspector-input" type="text" value="${c.text}" onchange="updateFrameChoice(${i}, 'text', this.value)" style="width: 100%; box-sizing: border-box;">
                   </div>
                   <div style="margin-bottom: 4px;">
-                      <label style="font-size: 11px; opacity: 0.7;">Target ID</label>
-                      <input class="inspector-input" type="text" value="${c.target}" onchange="updateFrameChoice(${i}, 'target', this.value)" style="width: 100%; box-sizing: border-box;">
+                      <label style="font-size: 11px; opacity: 0.7;">${targetLabel}</label>
+                      <input class="inspector-input" type="text" value="${c.target || ""}" onchange="updateFrameChoice(${i}, 'target', this.value)" style="width: 100%; box-sizing: border-box;" placeholder="${targetPlaceholder}">
                   </div>
                   <button class="danger small" onclick="removeFrameChoice(${i})" style="width: 100%; margin-top: 4px;">Remove</button>
-              </div>
-          `).join('')}
+              </div>`;
+            })
+            .join("")}
           <button class="primary-btn small" onclick="addFrameChoice()" style="width: 100%;">+ Add Choice</button>
-      </div>
+      </details>
 
-      <div class="form-group" style="border-top:1px solid #444; margin-top:10px; padding-top:10px;">
-          <label>Attributes</label>
-          ${Object.entries(frame.attributes || {}).map(([key, val]) => `
-              <div style="background: rgba(0,0,0,0.1); padding: 8px; border-radius: 4px; margin-bottom: 8px; border: 1px solid var(--border);">
+      <details id="details-exec" class="form-group" style="border-top:1px solid var(--border); margin-top:10px; padding-top:10px;" ${execOpen ? "open" : ""}>
+          <summary>
+            ${iconExpanded}
+            ${iconCollapsed}
+            Execute Function
+          </summary>
+          ${(frame.executeFunctions || [])
+            .map(
+              (val, i) => `
+              <div style="background: rgba(0,0,0,0.05); padding: 8px; border-radius: 4px; margin-bottom: 8px; border: 1px solid var(--border);">
                   <div style="margin-bottom: 4px;">
-                      <label style="font-size: 11px; opacity: 0.7;">Key</label>
-                      <input class="inspector-input" type="text" value="${key}" onchange="updateFrameAttribute(this.value, null, true, '${key}')" style="width: 100%; box-sizing: border-box;">
+                      <input class="inspector-input" type="text" value="${val}" oninput="updateExecuteFunction(${i}, this.value)" style="width: 100%; box-sizing: border-box;" placeholder="FunctionName()">
                   </div>
-                  <div style="margin-bottom: 4px;">
-                      <label style="font-size: 11px; opacity: 0.7;">Value</label>
-                      <input class="inspector-input" type="text" value="${val}" onchange="updateFrameAttribute('${key}', this.value)" style="width: 100%; box-sizing: border-box;">
-                  </div>
-                  <button class="danger small" onclick="deleteFrameAttribute('${key}')" style="width: 100%; margin-top: 4px;">Remove</button>
+                  <button class="danger small" onclick="deleteExecuteFunction(${i})" style="width: 100%; margin-top: 4px;">Remove</button>
               </div>
-          `).join('')}
-          <button class="primary-btn small" onclick="addFrameAttribute()" style="width: 100%;">+ Add Attribute</button>
+          `,
+            )
+            .join("")}
+          <button class="primary-btn small" onclick="addExecuteFunction()" style="width: 100%;">+ Add Function</button>
+      </details>
+
+      <div class="form-group" style="border-top:1px solid var(--border); margin-top:10px; padding-top:10px;">
+        <label>Background</label>
+        <select onchange="updateBackground(this.value)">${bgOpts}</select>
+        <button class="primary-btn" onclick="openModal('assetsModal')" style="margin-top:5px;">Manage Assets</button>
       </div>
 
-      <div class="form-group" style="border-top:1px solid #444; margin-top:10px; padding-top:10px;"><label>Background</label><select onchange="updateBackground(this.value)">${bgOpts}</select><button class="primary-btn" onclick="openModal('assetsModal')">Manage</button></div>
-      <button class="danger" onclick="deleteFrame()">Delete Slide</button>`;
+      <button class="danger" onclick="deleteFrame()" style="margin-top:20px;">Delete Slide</button>`;
     return;
   }
 
@@ -659,27 +781,30 @@ function renderInspector() {
   ].join("");
 
   container.innerHTML = `
-    <div style="margin-bottom:15px;padding-bottom:10px;border-bottom:1px solid #eee;"><strong>${char.name}</strong> (Slot ${selectedSlotIndex})</div>
-    <div class="form-group"><label>Body Sprite (Base Layer)</label><select onchange="updateSlotProp('body',this.value)">${bodyOpts}</select></div>
-    <div class="form-group"><label>Face Expression (Overlay Layer)</label><select onchange="updateSlotProp('face',this.value)">${faceOpts}</select></div>
-    <div class="form-group" style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
-      <div><label>Scale</label><input type="number" step="0.1" value="${slot.scale || 1}" onchange="updateSlotProp('scale',this.value)"></div>
-      <div><label>Layer Index</label><input type="number" step="1" value="${slot.zIndex !== undefined ? slot.zIndex : 0}" onchange="updateSlotProp('zIndex',this.value)"></div>
-    </div>
-    <div class="form-group" style="display:flex;align-items:center;gap:10px;">
-        <label><input type="checkbox" ${slot.mirror ? "checked" : ""} onchange="updateSlotProp('mirror',this.checked)"> Mirror X</label>
-    </div>
-    <div class="form-group" style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
-      <div><label>Pos X</label><input type="number" step="10" value="${slot.x || 0}" onchange="updateSlotProp('x',this.value)"></div>
-      <div><label>Pos Y</label><input type="number" step="10" value="${slot.y || 0}" onchange="updateSlotProp('y',this.value)"></div>
-    </div>
-    <div class="form-group"><label>Entrance Animation</label><select onchange="updateSlotProp('anim',this.value)">
-      <option value="none" ${slot.anim === "none" ? "selected" : ""}>None</option>
-      <option value="fade_in" ${slot.anim === "fade_in" ? "selected" : ""}>Fade In</option>
-      <option value="slide_left" ${slot.anim === "slide_left" ? "selected" : ""}>Slide Left</option>
-      <option value="slide_right" ${slot.anim === "slide_right" ? "selected" : ""}>Slide Right</option>
-    </select></div>
-    <button class="danger" onclick="clearSlot(${selectedSlotIndex})">Remove Character</button>`;
+      <div style="margin-bottom:15px;padding-bottom:10px;border-bottom:1px solid var(--border);"><strong>${char.name}</strong> (Slot ${selectedSlotIndex})</div>
+      <div class="form-group"><label>Body Sprite (Base Layer)</label><select onchange="updateSlotProp('body',this.value)">${bodyOpts}</select></div>
+      <div class="form-group"><label>Face Expression (Overlay Layer)</label><select onchange="updateSlotProp('face',this.value)">${faceOpts}</select></div>
+      <div class="form-group" style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+        <div><label>Scale</label><input type="number" step="0.1" value="${slot.scale}" onchange="updateSlotProp('scale',this.value)"></div>
+        <div><label>Z-Index</label><input type="number" step="1" value="${slot.zIndex}" onchange="updateSlotProp('zIndex',this.value)"></div>
+        <div><label>X Offset</label><input type="number" step="10" value="${slot.x}" onchange="updateSlotProp('x',this.value)"></div>
+        <div><label>Y Offset</label><input type="number" step="10" value="${slot.y}" onchange="updateSlotProp('y',this.value)"></div>
+      </div>
+      <div class="form-group">
+        <label>Effects</label>
+        <label class="primary-btn small" style="width:100%;justify-content:center;">
+           <input type="checkbox" ${slot.mirror ? "checked" : ""} onchange="updateSlotProp('mirror', this.checked)"> Mirror (Flip X)
+        </label>
+      </div>
+      <div class="form-group"><label>Animation</label>
+        <select onchange="updateSlotProp('anim',this.value)">
+            <option value="none" ${slot.anim === "none" ? "selected" : ""}>None</option>
+            <option value="fade_in" ${slot.anim === "fade_in" ? "selected" : ""}>Fade In</option>
+            <option value="slide_left" ${slot.anim === "slide_left" ? "selected" : ""}>Slide In Left</option>
+            <option value="slide_right" ${slot.anim === "slide_right" ? "selected" : ""}>Slide In Right</option>
+            <option value="shake" ${slot.anim === "shake" ? "selected" : ""}>Shake</option>
+        </select>
+      </div>`;
 }
 
 function initOverlayEditorEvents() {
@@ -960,7 +1085,7 @@ function onFrameDrop(e) {
   );
 }
 
-function onFrameDragEnd(e) { }
+function onFrameDragEnd(e) {}
 
 let contextFrameIndex = null;
 
@@ -983,7 +1108,7 @@ function onFrameContextMenu(e) {
 
 function pasteFrameAt(idx) {
   if (!frameClipboard) {
-    if (typeof showToast === 'function') showToast("Nothing to paste", "info");
+    if (typeof showToast === "function") showToast("Nothing to paste", "info");
     return;
   }
   const cloned = createFrameFromTemplate(frameClipboard);
@@ -1028,7 +1153,8 @@ async function optimizeImage(dataUrl, quality = 0.8) {
 }
 
 async function optimizeProjectImages() {
-  if (typeof showToast === "function") showToast("Optimizing images...", "info");
+  if (typeof showToast === "function")
+    showToast("Optimizing images...", "info");
 
   // Optimize Characters
   for (const char of project.characters) {
@@ -1101,7 +1227,10 @@ async function importJSON(e) {
 
   try {
     let imported;
-    if (file.name.endsWith('.vns') || (file.name.endsWith('.json') && file.size > 0)) {
+    if (
+      file.name.endsWith(".vns") ||
+      (file.name.endsWith(".json") && file.size > 0)
+    ) {
       // Attempt to decompress first if it's .vns OR we want to try
       // If browser supports DecompressionStream
       if (window.DecompressionStream) {
@@ -1388,18 +1517,22 @@ function initStageViewEvents() {
   const wrapper = document.getElementById("stageWrapper");
   const stage = document.getElementById("visualStage");
 
-  wrapper.addEventListener("wheel", (e) => {
-    // Zoom with wheel
-    // If ctrl key is pressed or just default behavior? 
-    // Let's make it always zoom for now as that's standard in canvas apps
-    e.preventDefault();
-    const delta = e.deltaY > 0 ? -0.1 : 0.1;
-    let newScale = stageView.scale + delta;
-    // Clamp scale
-    newScale = Math.max(0.1, Math.min(5, newScale));
-    stageView.scale = newScale;
-    updateStageTransform();
-  }, { passive: false });
+  wrapper.addEventListener(
+    "wheel",
+    (e) => {
+      // Zoom with wheel
+      // If ctrl key is pressed or just default behavior?
+      // Let's make it always zoom for now as that's standard in canvas apps
+      e.preventDefault();
+      const delta = e.deltaY > 0 ? -0.1 : 0.1;
+      let newScale = stageView.scale + delta;
+      // Clamp scale
+      newScale = Math.max(0.1, Math.min(5, newScale));
+      stageView.scale = newScale;
+      updateStageTransform();
+    },
+    { passive: false },
+  );
 
   wrapper.addEventListener("mousedown", (e) => {
     // Middle click (button 1) or Space + Left Click (button 0 + space)
@@ -1429,7 +1562,11 @@ function initStageViewEvents() {
 
   // Also handle Space key for temporary cursor change
   window.addEventListener("keydown", (e) => {
-    if (e.code === "Space" && !e.repeat && document.activeElement === document.body) {
+    if (
+      e.code === "Space" &&
+      !e.repeat &&
+      document.activeElement === document.body
+    ) {
       wrapper.style.cursor = "grab";
     }
   });
@@ -1460,12 +1597,14 @@ function updateStageTransform() {
 
     const VISIBLE_MARGIN = 100 * stageView.scale;
 
-    const minX = - (900 * stageView.scale) / 2 - wrapperRect.width / 2 + VISIBLE_MARGIN;
-    const maxX = (900 * stageView.scale) / 2 + wrapperRect.width / 2 - VISIBLE_MARGIN;
+    const minX =
+      -(900 * stageView.scale) / 2 - wrapperRect.width / 2 + VISIBLE_MARGIN;
+    const maxX =
+      (900 * stageView.scale) / 2 + wrapperRect.width / 2 - VISIBLE_MARGIN;
 
-    // Wait, the previous logic (Center clamped to Wrapper Half-Size) ensures the center stays in view. 
-    // Maybe they want to clamp it so the EDGE aligns with the wrapper if possible? 
-    // Standard "Canvas" behavior: 
+    // Wait, the previous logic (Center clamped to Wrapper Half-Size) ensures the center stays in view.
+    // Maybe they want to clamp it so the EDGE aligns with the wrapper if possible?
+    // Standard "Canvas" behavior:
     // If zoomed IN: Allow panning until edge hits viewport edge.
     // If zoomed OUT: Allow centering?
 
@@ -1494,8 +1633,8 @@ function updateStageTransform() {
     // Let's stick to the "Center in Viewport" rule but stricter.
     // Center of Wrapper = 0,0 relative.
 
-    const limitX = Math.max(0, (scaledWidth / 2 + wrapperRect.width / 2) - 50); // Keep 50px overlapping
-    const limitY = Math.max(0, (scaledHeight / 2 + wrapperRect.height / 2) - 50);
+    const limitX = Math.max(0, scaledWidth / 2 + wrapperRect.width / 2 - 50); // Keep 50px overlapping
+    const limitY = Math.max(0, scaledHeight / 2 + wrapperRect.height / 2 - 50);
 
     stageView.x = Math.max(-limitX, Math.min(limitX, stageView.x));
     stageView.y = Math.max(-limitY, Math.min(limitY, stageView.y));
