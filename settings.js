@@ -55,7 +55,6 @@ function saveAndApplySettings() {
 function applyEffects() {
   const root = document.documentElement;
 
-  // Apply theme by setting data attribute
   if (appSettings.theme === "dark") {
     root.setAttribute("data-theme", "dark");
   } else {
@@ -69,8 +68,6 @@ function applyEffects() {
 
   const stage = document.getElementById("visualStage");
   if (stage) {
-    // stage.style.background = ""; // Don't wipe everything, main.js handles the image
-
     if (appSettings.stageBackground === "white") {
       stage.style.backgroundColor = "white";
     } else if (appSettings.stageBackground === "black") {
@@ -101,7 +98,6 @@ function applyEffects() {
     if (el) el.remove();
   }
 
-  // Refreshes the frame content (background image) if the function exists
   if (typeof renderStage === "function") {
     renderStage();
   }
@@ -118,7 +114,7 @@ function resetSettings() {
     };
     try {
       localStorage.removeItem("vnEditorSettings");
-    } catch (e) { }
+    } catch (e) {}
 
     openSettingsModal();
     applyEffects();

@@ -1,5 +1,4 @@
 :root {
-    /* Light Theme Colors */
     --bg-app: #f8fafc;
     --bg-panel: #ffffff;
     --bg-secondary: #f1f5f9;
@@ -22,12 +21,10 @@
     --success: #10b981;
     --warning: #f59e0b;
 
-    /* Transitions */
     --transition-fast: 150ms cubic-bezier(0.4, 0, 0.2, 1);
     --transition-base: 200ms cubic-bezier(0.4, 0, 0.2, 1);
     --transition-slow: 300ms cubic-bezier(0.4, 0, 0.2, 1);
 
-    /* Border Radius */
     --radius-sm: 4px;
     --radius-md: 6px;
     --radius-lg: 8px;
@@ -35,7 +32,6 @@
 }
 
 [data-theme="dark"] {
-    /* Dark Theme Colors - Unity Engine Style */
     --bg-app: #202020;
     --bg-panel: #383838;
     --bg-secondary: #2d2d2d;
@@ -170,7 +166,6 @@ button:hover {
     box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
 }
 
-/* Primary button — used for main actions and labels that act like buttons */
 .primary-btn,
 label.primary-btn {
     display: inline-flex;
@@ -186,7 +181,6 @@ label.primary-btn {
     font-size: 13px;
     cursor: pointer;
     text-decoration: none;
-    /* transition: 0.1s; */
 }
 
 .primary-btn:hover,
@@ -206,7 +200,6 @@ label.primary-btn:hover {
     border-radius: 6px;
 }
 
-/* Danger (destructive) buttons */
 .danger,
 label.danger {
     display: inline-flex;
@@ -221,7 +214,6 @@ label.danger {
     font-weight: 600;
     font-size: 13px;
     cursor: pointer;
-    /* transition: 0.1s; */
 }
 
 .danger:hover,
@@ -236,13 +228,11 @@ label.danger:hover {
     border-radius: 6px;
 }
 
-/* Hidden file inputs inside label buttons */
 label.primary-btn input[type="file"],
 label.danger input[type="file"] {
     display: none;
 }
 
-/* Disabled state */
 button[disabled],
 .primary-btn[disabled],
 .danger[disabled] {
@@ -250,7 +240,6 @@ button[disabled],
     pointer-events: none;
 }
 
-/* Theme-specific tweaks */
 [data-theme="dark"] .primary-btn,
 [data-theme="dark"] label.primary-btn {
     border-color: rgba(255, 255, 255, 0.06);
@@ -260,8 +249,6 @@ button[disabled],
 [data-theme="dark"] label.danger {
     border-color: rgba(255, 255, 255, 0.06);
 }
-
-/* Note: Only `.primary-btn` and `.danger` button types are supported. */
 
 .workspace {
     display: flex;
@@ -347,8 +334,7 @@ button[disabled],
     overflow: hidden;
     padding: 20px;
     position: relative;
-    background: #dfdfdf;
-    /* darker bg to see bounds */
+    background: var(--bg-app);
 }
 
 .visual-stage {
@@ -366,7 +352,6 @@ button[disabled],
     transition: background-image 0.6s ease;
     overflow: hidden;
     transform-origin: center center;
-    /* Transformation handled by JS */
 }
 
 .stage-controls {
@@ -669,8 +654,6 @@ button[disabled],
     color: #b91c1c;
 }
 
-/* delete-slide-btn removed; use .danger instead */
-
 .asset-item {
     display: flex;
     justify-content: space-between;
@@ -830,8 +813,6 @@ textarea {
     text-overflow: ellipsis;
 }
 
-/* Use .danger for destructive inline list actions */
-
 .preview-viewport {
     flex: 1;
     background: #000;
@@ -919,6 +900,50 @@ textarea {
 .p-textbox {
     font-size: 16px;
     line-height: 1.5;
+}
+
+.p-choice-container {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 60%;
+    z-index: 150;
+    display: flex;
+    flex-direction: column;
+    gap: 15px;
+    opacity: 0;
+    pointer-events: none;
+    transition:
+        opacity 0.4s ease,
+        transform 0.4s ease;
+}
+
+.p-choice-container.visible {
+    opacity: 1;
+    pointer-events: auto;
+    transform: translate(-50%, -52%);
+}
+
+.p-choice-btn {
+    background: rgba(0, 0, 0, 0.75);
+    backdrop-filter: blur(8px);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    border-radius: 8px;
+    padding: 15px 30px;
+    color: white;
+    font-size: 16px;
+    font-weight: 500;
+    text-align: center;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
+}
+
+.p-choice-btn:hover {
+    background: var(--primary);
+    border-color: var(--primary-light);
+    box-shadow: 0 6px 20px rgba(59, 130, 246, 0.4);
 }
 
 .p-controls {
@@ -1082,8 +1107,6 @@ textarea {
     z-index: 11;
 }
 
-/* list-item-del-btn, char-remove-btn and upload-btn replaced by .danger or .primary-btn in markup. */
-
 .resize-handle:hover {
     background: #3b82f6;
 }
@@ -1168,8 +1191,8 @@ textarea {
 
 .film-frame-add {
     min-width: 120px;
-    max-width: 120px; /* Matches film-frame width constraint */
-    height: 100%; /* Matches film-frame height to fill the container */
+    max-width: 120px;
+    height: 100%;
     background: var(--hover-bg);
     border: 2px dashed #d1d5db;
     border-radius: 6px;
@@ -1178,7 +1201,6 @@ textarea {
     justify-content: center;
     cursor: pointer;
     transition: all 0.2s;
-    /* margin: 10px; REMOVED: Spacing is now handled by the parent's gap */
     color: var(--text-muted);
     font-size: 24px;
 }

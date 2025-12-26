@@ -1,6 +1,9 @@
 let previewCurrentIndex = 0;
 let previousCharRects = new Map();
 let typingTimer = null;
+let lastMainFrameIndex = -1;
+
+let instantReturnIndex = null;
 
 function updatePreviewRatio() {
   const vp = document.getElementById("pViewport");
@@ -51,6 +54,12 @@ function typeWriter(element, htmlString) {
 function renderPreviewFrame() {
   const chapter = getChapter();
   const frame = chapter.frames[previewCurrentIndex];
+
+  if (!frame.frameType || frame.frameType === "main") {
+    lastMainFrameIndex = previewCurrentIndex;
+    instantReturnIndex = null;
+  }
+
   const bgObj = project.assets.backgrounds.find(
     (b) => b.name === frame.background,
   );
@@ -73,6 +82,24 @@ function renderPreviewFrame() {
 
   const dialogueLayer = document.querySelector(".p-dialogue-layer");
   dialogueLayer.classList.toggle("visible", !!frame.text);
+
+  const choiceContainer = document.getElementById("pChoiceContainer");
+  choiceContainer.innerHTML = "";
+  if (frame.choices && frame.choices.length > 0) {
+    frame.choices.forEach((choice) => {
+      const btn = document.createElement("div");
+      btn.className = "p-choice-btn";
+      btn.textContent = choice.text;
+      btn.onclick = (e) => {
+        e.stopPropagation();
+        handleChoiceClick(choice);
+      };
+      choiceContainer.appendChild(btn);
+    });
+    choiceContainer.classList.add("visible");
+  } else {
+    choiceContainer.classList.remove("visible");
+  }
 
   const newSlotCharIds = new Set();
   frame.slots.forEach((s) => {
@@ -209,6 +236,7 @@ function renderPreviewFrame() {
 
 function openPreview() {
   previewCurrentIndex = activeFrameIndex;
+  lastMainFrameIndex = -1;
   previousCharRects.clear();
   openModal("previewModal");
   updatePreviewRatio();
@@ -218,8 +246,55 @@ function openPreview() {
 
 function nextPreview() {
   const chapter = getChapter();
-  if (previewCurrentIndex < chapter.frames.length - 1) {
-    previewCurrentIndex++;
+  const currentFrame = chapter.frames[previewCurrentIndex];
+
+  if (currentFrame && currentFrame.choices && currentFrame.choices.length > 0)
+    return;
+
+  const isInstant = currentFrame && currentFrame.frameType === "instant";
+
+  if (isInstant) {
+    const returnIdx = Number.isInteger(instantReturnIndex)
+      ? instantReturnIndex
+      : null;
+
+    if (returnIdx !== null) {
+      previewCurrentIndex = returnIdx + 1;
+      instantReturnIndex = null;
+
+      while (
+        previewCurrentIndex < chapter.frames.length &&
+        chapter.frames[previewCurrentIndex].frameType === "instant"
+      ) {
+        previewCurrentIndex++;
+      }
+
+      if (previewCurrentIndex < chapter.frames.length) {
+        renderPreviewFrame();
+      } else {
+        closeModal("previewModal");
+        window.removeEventListener("resize", updatePreviewRatio);
+        if (typingTimer) clearTimeout(typingTimer);
+      }
+      return;
+    }
+
+    closeModal("previewModal");
+    window.removeEventListener("resize", updatePreviewRatio);
+    if (typingTimer) clearTimeout(typingTimer);
+    return;
+  }
+
+  let nextIdx = previewCurrentIndex + 1;
+  while (
+    nextIdx < chapter.frames.length &&
+    chapter.frames[nextIdx].frameType === "instant"
+  ) {
+    nextIdx++;
+  }
+
+  if (nextIdx < chapter.frames.length) {
+    previewCurrentIndex = nextIdx;
     renderPreviewFrame();
   } else {
     closeModal("previewModal");
@@ -229,8 +304,56 @@ function nextPreview() {
 }
 
 function prevPreview() {
-  if (previewCurrentIndex > 0) {
-    previewCurrentIndex--;
+  const chapter = getChapter();
+  const currentFrame = chapter.frames[previewCurrentIndex];
+
+  if (currentFrame && currentFrame.frameType === "instant") {
+    if (Number.isInteger(instantReturnIndex)) {
+      previewCurrentIndex = instantReturnIndex;
+      instantReturnIndex = null;
+      renderPreviewFrame();
+    }
+    return;
+  }
+
+  let prevIdx = previewCurrentIndex - 1;
+  while (prevIdx >= 0 && chapter.frames[prevIdx].frameType === "instant") {
+    prevIdx--;
+  }
+
+  if (prevIdx >= 0) {
+    previewCurrentIndex = prevIdx;
     renderPreviewFrame();
+  }
+}
+
+function handleChoiceClick(choice) {
+  if (choice.type === "jump") {
+    const chapter = getChapter();
+    const targetId = parseInt(choice.target);
+    const targetIdx = chapter.frames.findIndex((f) => f.id === targetId);
+
+    if (targetIdx !== -1) {
+      const targetFrame = chapter.frames[targetIdx];
+      if (targetFrame && targetFrame.frameType === "instant") {
+        instantReturnIndex = previewCurrentIndex;
+      } else {
+        instantReturnIndex = null;
+      }
+
+      previewCurrentIndex = targetIdx;
+      renderPreviewFrame();
+    } else {
+      console.warn("Choice target frame not found:", choice.target);
+      nextPreview();
+    }
+  } else if (choice.type === "exec") {
+    try {
+      const fn = new Function(choice.target);
+      fn();
+    } catch (e) {
+      console.error("Error executing choice function:", e);
+    }
+    nextPreview();
   }
 }

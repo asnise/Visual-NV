@@ -50,7 +50,7 @@ let selectedSlotIndex = -1;
 let editingCharId = null;
 let editingOverlayIdx = -1;
 let frameClipboard = null;
-let activeFilmstripTab = "main"; // "main" or "instant"
+let activeFilmstripTab = "main";
 
 let isDragging = false;
 let isResizing = false;
@@ -106,7 +106,7 @@ function createFrameFromTemplate(templateFrame) {
   if (!clone.attributes) clone.attributes = {};
   if (!clone.frameType) clone.frameType = "main";
   if (clone.frameType === "instant" && !clone.returnToFrame) {
-    clone.returnToFrame = "continue";
+    clone.returnToFrame = "end";
   }
   return clone;
 }
@@ -235,6 +235,11 @@ function updateFrameChoice(index, key, val) {
 
 function addFrameChoice() {
   const frame = getFrame();
+
+  if ((frame.frameType || "main") === "instant") {
+    return alert("Choices cannot be added to an Instant Frame.");
+  }
+
   if (!frame.choices) frame.choices = [];
   frame.choices.push({ type: "jump", text: "New Choice", target: "" });
   renderInspector();
@@ -291,8 +296,9 @@ function switchFilmstripTab(tab) {
 function updateFrameType(type) {
   const frame = getFrame();
   frame.frameType = type;
+
   if (type === "instant" && !frame.returnToFrame) {
-    frame.returnToFrame = "continue";
+    frame.returnToFrame = "end";
   }
   renderInspector();
   renderFilmstrip();
@@ -300,7 +306,8 @@ function updateFrameType(type) {
 
 function updateReturnToFrame(value) {
   const frame = getFrame();
-  frame.returnToFrame = value;
+
+  frame.returnToFrame = "return";
   renderInspector();
 }
 
@@ -549,7 +556,7 @@ function renderStage() {
     if (i === selectedSlotIndex) {
       const closeBtn = document.createElement("div");
       closeBtn.textContent = "Remove";
-      // Use destructive button style and inline layout to preserve position
+
       closeBtn.className = "danger";
       closeBtn.style.cssText =
         "position:absolute;top:8px;right:8px;padding:4px 8px;border-radius:5px;font-size:12px;line-height:1;text-align:center;cursor:pointer;z-index:20;background:var(--danger);color:#fff;border:1px solid var(--danger);";
@@ -611,7 +618,6 @@ function renderFilmstrip() {
 function renderInspector() {
   const container = document.getElementById("inspectorContent");
 
-  // Preserve expand/collapse state
   const choicesEl = container.querySelector("#details-choices");
   const choicesOpen = choicesEl ? choicesEl.hasAttribute("open") : true;
 
@@ -620,20 +626,16 @@ function renderInspector() {
 
   const frame = getFrame();
 
-  // Define Icons
-  // Icon for Expanded State (Down Arrow)
   const iconExpanded = `
     <svg class="icon-expanded" style="width:16px; height:16px; margin-right:5px;" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
       <path stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="m19 9-7 7-7-7"/>
     </svg>`;
 
-  // Icon for Collapsed State (Right Arrow)
   const iconCollapsed = `
     <svg class="icon-collapsed" style="width:16px; height:16px; margin-right:5px;" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
       <path stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="m9 5 7 7-7 7"/>
     </svg>`;
 
-  // Inline CSS for the toggling behavior
   const styles = `
     <style>
         details > summary {
@@ -648,7 +650,7 @@ function renderInspector() {
         }
         details > summary::-webkit-details-marker { display: none; }
 
-        /* Toggle Icons based on open attribute */
+
         details[open] .icon-collapsed { display: none; }
         details:not([open]) .icon-expanded { display: none; }
     </style>`;
@@ -667,20 +669,7 @@ function renderInspector() {
       )
       .join("");
 
-    // Instant Frame Logic
     let instantControls = "";
-    if (activeFilmstripTab === "instant") {
-      const returnVal = frame.returnToFrame || "continue";
-      instantControls = `
-            <div class="form-group" style="background:var(--bg-secondary); padding:10px; border-radius:4px; margin-bottom:15px;">
-                <label style="color:var(--primary);">Instant Frame Action</label>
-                <div style="margin-bottom:8px;font-size:11px;color:var(--text-muted);">When dialogue finishes:</div>
-                <select onchange="updateReturnToFrame(this.value)">
-                    <option value="continue" ${returnVal === "continue" ? "selected" : ""}>Jump to Next Frame</option>
-                    <option value="return" ${returnVal === "return" ? "selected" : ""}>Return to Main Timeline</option>
-                </select>
-            </div>`;
-    }
 
     container.innerHTML = `
       ${styles}
@@ -706,7 +695,9 @@ function renderInspector() {
             .map((c, i) => {
               const type = c.type || "jump";
               const targetLabel =
-                type === "jump" ? "Target Frame ID" : "Function Name";
+                type === "jump"
+                  ? "Target Frame (via Node Graph)"
+                  : "Function Name";
               const targetPlaceholder =
                 type === "jump" ? "Frame ID" : "myFunction()";
               return `
@@ -722,10 +713,19 @@ function renderInspector() {
                       <label style="font-size: 11px; opacity: 0.7;">Choice Text</label>
                       <input class="inspector-input" type="text" value="${c.text}" onchange="updateFrameChoice(${i}, 'text', this.value)" style="width: 100%; box-sizing: border-box;">
                   </div>
-                  <div style="margin-bottom: 4px;">
-                      <label style="font-size: 11px; opacity: 0.7;">${targetLabel}</label>
-                      <input class="inspector-input" type="text" value="${c.target || ""}" onchange="updateFrameChoice(${i}, 'target', this.value)" style="width: 100%; box-sizing: border-box;" placeholder="${targetPlaceholder}">
-                  </div>
+                  ${
+                    type === "jump"
+                      ? `<div style="margin-bottom: 4px;">
+                          <label style="font-size: 11px; opacity: 0.7;">${targetLabel}</label>
+                          <div class="inspector-input" style="width: 100%; box-sizing: border-box; opacity: 0.75;">
+                            Connect this Choice in the Node Graph to set its target.
+                          </div>
+                        </div>`
+                      : `<div style="margin-bottom: 4px;">
+                          <label style="font-size: 11px; opacity: 0.7;">${targetLabel}</label>
+                          <input class="inspector-input" type="text" value="${c.target || ""}" onchange="updateFrameChoice(${i}, 'target', this.value)" style="width: 100%; box-sizing: border-box;" placeholder="${targetPlaceholder}">
+                        </div>`
+                  }
                   <button class="danger small" onclick="removeFrameChoice(${i})" style="width: 100%; margin-top: 4px;">Remove</button>
               </div>`;
             })
@@ -1147,7 +1147,7 @@ async function optimizeImage(dataUrl, quality = 0.8) {
       ctx.drawImage(img, 0, 0);
       resolve(canvas.toDataURL("image/webp", quality));
     };
-    img.onerror = () => resolve(dataUrl); // Fallback
+    img.onerror = () => resolve(dataUrl);
     img.src = dataUrl;
   });
 }
@@ -1156,7 +1156,6 @@ async function optimizeProjectImages() {
   if (typeof showToast === "function")
     showToast("Optimizing images...", "info");
 
-  // Optimize Characters
   for (const char of project.characters) {
     for (const body of char.bodies) {
       if (body.url) body.url = await optimizeImage(body.url);
@@ -1166,29 +1165,26 @@ async function optimizeProjectImages() {
     }
   }
 
-  // Optimize Backgrounds
   for (const bg of project.assets.backgrounds) {
     if (bg.url) bg.url = await optimizeImage(bg.url);
   }
 }
 
 async function saveJSON() {
-  await optimizeProjectImages(); // Compress images before saving
+  await optimizeProjectImages();
 
-  const jsonString = JSON.stringify(project); // No whitespace for smaller size
+  const jsonString = JSON.stringify(project);
 
   if (window.CompressionStream) {
-    // Use GZIP compression
     const stream = new Blob([jsonString]).stream();
     const compressedStream = stream.pipeThrough(new CompressionStream("gzip"));
     const compressedBlob = await new Response(compressedStream).blob();
 
     const a = document.createElement("a");
     a.href = URL.createObjectURL(compressedBlob);
-    a.download = "vn-project-save.vns"; // .vns for Compressed Visual Novel Save
+    a.download = "vn-project-save.vns";
     a.click();
   } else {
-    // Fallback
     const blob = new Blob([jsonString], { type: "application/json" });
     const a = document.createElement("a");
     a.href = URL.createObjectURL(blob);
@@ -1231,8 +1227,6 @@ async function importJSON(e) {
       file.name.endsWith(".vns") ||
       (file.name.endsWith(".json") && file.size > 0)
     ) {
-      // Attempt to decompress first if it's .vns OR we want to try
-      // If browser supports DecompressionStream
       if (window.DecompressionStream) {
         try {
           const ds = new DecompressionStream("gzip");
@@ -1241,8 +1235,6 @@ async function importJSON(e) {
           const text = await decompressedBlob.text();
           imported = JSON.parse(text);
         } catch (err) {
-          // Decompression failed, maybe it's plain text JSON
-          // Console.log("Decompression failed, trying plain text", err);
           const text = await file.text();
           imported = JSON.parse(text);
         }
@@ -1520,13 +1512,10 @@ function initStageViewEvents() {
   wrapper.addEventListener(
     "wheel",
     (e) => {
-      // Zoom with wheel
-      // If ctrl key is pressed or just default behavior?
-      // Let's make it always zoom for now as that's standard in canvas apps
       e.preventDefault();
       const delta = e.deltaY > 0 ? -0.1 : 0.1;
       let newScale = stageView.scale + delta;
-      // Clamp scale
+
       newScale = Math.max(0.1, Math.min(5, newScale));
       stageView.scale = newScale;
       updateStageTransform();
@@ -1535,7 +1524,6 @@ function initStageViewEvents() {
   );
 
   wrapper.addEventListener("mousedown", (e) => {
-    // Middle click (button 1) or Space + Left Click (button 0 + space)
     if (e.button === 1 || (e.button === 0 && e.code === "Space")) {
       e.preventDefault();
       stageView.isPanning = true;
@@ -1560,7 +1548,6 @@ function initStageViewEvents() {
     }
   });
 
-  // Also handle Space key for temporary cursor change
   window.addEventListener("keydown", (e) => {
     if (
       e.code === "Space" &&
@@ -1582,18 +1569,9 @@ function updateStageTransform() {
   const stage = document.getElementById("visualStage");
   const wrapper = document.getElementById("stageWrapper");
 
-  // Strict limit: Center of stage cannot leave the viewport
   if (stage && wrapper) {
     const wrapperRect = wrapper.getBoundingClientRect();
     const stageRect = stage.getBoundingClientRect();
-
-    // We want to limit the translation (x,y) so that the stage edges don't go too far
-    // Current transform: translate(x, y) scale(s)
-
-    // Calculate allowable range
-    // If stage is larger than wrapper, we can pan to edges?
-    // Actually, simpler user request: "limit translate X,Y" usually means "clamp it so I can't lose it"
-    // Let's make it so at least 100px of the stage is always visible.
 
     const VISIBLE_MARGIN = 100 * stageView.scale;
 
@@ -1602,38 +1580,17 @@ function updateStageTransform() {
     const maxX =
       (900 * stageView.scale) / 2 + wrapperRect.width / 2 - VISIBLE_MARGIN;
 
-    // Wait, the previous logic (Center clamped to Wrapper Half-Size) ensures the center stays in view.
-    // Maybe they want to clamp it so the EDGE aligns with the wrapper if possible?
-    // Standard "Canvas" behavior:
-    // If zoomed IN: Allow panning until edge hits viewport edge.
-    // If zoomed OUT: Allow centering?
-
-    // Let's try the "Center must be within Wrapper Bounds" logic again but slightly tighter?
-    // The user said "visualStage limit translate X,Y" which is very specific about X and Y.
-    // I will clamp X and Y to strictly keep the center inside the wrapper, which is what I had,
-    // but maybe they faced an issue where it was still too loose.
-
-    // Let's implement a "Box Containment" logic.
-    // X and Y are translation offsets from CENTER.
-
     const scaledWidth = 900 * stageView.scale;
     const scaledHeight = 550 * stageView.scale;
 
-    // Range of motion for X
     let xRange = 0;
     if (scaledWidth > wrapperRect.width) {
       xRange = (scaledWidth - wrapperRect.width) / 2;
     } else {
-      // If stage is smaller, keep it centered? Or allow free movement?
-      // Usually centered is nicer, but maybe they want to pan?
       xRange = (wrapperRect.width - scaledWidth) / 2;
     }
 
-    // Because we translate from center, we need to be careful.
-    // Let's stick to the "Center in Viewport" rule but stricter.
-    // Center of Wrapper = 0,0 relative.
-
-    const limitX = Math.max(0, scaledWidth / 2 + wrapperRect.width / 2 - 50); // Keep 50px overlapping
+    const limitX = Math.max(0, scaledWidth / 2 + wrapperRect.width / 2 - 50);
     const limitY = Math.max(0, scaledHeight / 2 + wrapperRect.height / 2 - 50);
 
     stageView.x = Math.max(-limitX, Math.min(limitX, stageView.x));
@@ -1642,7 +1599,6 @@ function updateStageTransform() {
 
   stage.style.transform = `translate(${stageView.x}px, ${stageView.y}px) scale(${stageView.scale})`;
 
-  // Update label
   const label = document.getElementById("stageZoomLabel");
   if (label) label.textContent = Math.round(stageView.scale * 100) + "%";
 }

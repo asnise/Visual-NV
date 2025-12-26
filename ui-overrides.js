@@ -322,8 +322,10 @@
 
     try {
       let imported;
-      // Check for .vns or attempt decompression if desired, mirroring main.js logic
-      if (file.name.endsWith('.vns') || (file.name.endsWith('.json') && file.size > 0)) {
+      if (
+        file.name.endsWith(".vns") ||
+        (file.name.endsWith(".json") && file.size > 0)
+      ) {
         if (window.DecompressionStream) {
           try {
             const ds = new DecompressionStream("gzip");
@@ -332,7 +334,6 @@
             const text = await decompressedBlob.text();
             imported = JSON.parse(text);
           } catch (err) {
-            // Fallback to text if decompression fails
             const text = await file.text();
             imported = JSON.parse(text);
           }
@@ -341,7 +342,6 @@
           imported = JSON.parse(text);
         }
       } else {
-        // Standard text read
         const text = await file.text();
         imported = JSON.parse(text);
       }
@@ -361,5 +361,35 @@
       showToast("Error parsing project file", "error");
     }
     e.target.value = "";
+  };
+
+  window.openNodeGraph = function () {
+    if (window.NodeGraph && typeof window.NodeGraph.open === "function") {
+      window.NodeGraph.open(
+        typeof activeChapterId !== "undefined" ? activeChapterId : null,
+      );
+      return;
+    }
+
+    const existing = document.querySelector('script[src="node-graph.js"]');
+    if (!existing) {
+      const s = document.createElement("script");
+      s.src = "node-graph.js";
+      s.onload = () => {
+        if (window.NodeGraph && typeof window.NodeGraph.open === "function") {
+          window.NodeGraph.open(
+            typeof activeChapterId !== "undefined" ? activeChapterId : null,
+          );
+        } else {
+          showToast("Node Graph failed to load", "error");
+        }
+      };
+      s.onerror = () => showToast("Failed to load node-graph.js", "error");
+      document.head.appendChild(s);
+      showToast("Loading Node Graph…", "info");
+      return;
+    }
+
+    showToast("Node Graph is not available", "error");
   };
 })();
