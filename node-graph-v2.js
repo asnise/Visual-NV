@@ -1,10 +1,8 @@
 (function () {
   "use strict";
 
-  
-
   const NodeGraphV2 = (() => {
-    const STORAGE_KEY = "graphV2"; 
+    const STORAGE_KEY = "graphV2";
     const VERSION = 1;
 
     const CFG = {
@@ -25,10 +23,7 @@
         hit: 18,
       },
 
-      
-      
       colors: {
-        
         bg: "var(--bg-app)",
         panel: "var(--bg-panel)",
         panel2: "var(--bg-secondary)",
@@ -36,16 +31,13 @@
         text: "var(--text-main)",
         muted: "var(--text-muted)",
 
-        
         accent: "var(--primary)",
         ok: "var(--success)",
         danger: "var(--danger)",
         warn: "var(--warning)",
 
-        
         choice: "#a855f7",
 
-        
         link: "var(--primary)",
         linkSoft: "var(--slot-drag)",
         linkNext: "var(--success)",
@@ -61,18 +53,16 @@
       links: [],
       startFrameId: null,
 
-      
       selectedNodeId: null,
-      selectingFrom: null, 
-      hoverPort: null, 
+      selectingFrom: null,
+      hoverPort: null,
       hoverNodeId: null,
       hoverLinkId: null,
 
       viewport: { x: 0, y: 0, scale: 1 },
 
-      drag: null, 
+      drag: null,
 
-      
       ui: {
         overlay: null,
         modal: null,
@@ -86,10 +76,6 @@
       _cssInjected: false,
       _autosaveTimer: null,
     };
-
-    
-    
-    
 
     function clamp(n, a, b) {
       return Math.max(a, Math.min(b, n));
@@ -147,8 +133,6 @@
     }
 
     function ensureChoiceIds() {
-      
-      
       const frames = getFrames();
       let mutated = false;
 
@@ -158,7 +142,7 @@
 
         for (const c of choices) {
           if (!c || typeof c !== "object") continue;
-          
+
           const type = (c.type || "jump").toLowerCase();
           if (type !== "jump") continue;
 
@@ -166,13 +150,11 @@
             c.id = nowId("choice");
             mutated = true;
           } else {
-            
             c.id = String(c.id);
           }
         }
       }
 
-      
       if (mutated) {
         scheduleAutosave("ensure_choice_ids");
         try {
@@ -189,23 +171,9 @@
     }
 
     function applyGraphLinksToFrames() {
-      
-      
-      
-      
-      
-      
-      
-      
-      
-      
-      
-      
-      
       const frames = getFrames();
       if (!frames || !frames.length) return { ok: false, reason: "No frames." };
 
-      
       const nodeToFrameId = new Map();
       for (const n of STATE.nodes || []) {
         if (!n || n.type !== "frame") continue;
@@ -221,11 +189,10 @@
         frameById.set(fid, f);
       }
 
-      
       for (const f of frames) {
         if (!f) continue;
         ensureFrameAttributes(f);
-        
+
         f.attributes.next = "";
 
         const choices = Array.isArray(f.choices) ? f.choices : [];
@@ -233,12 +200,11 @@
           if (!c || typeof c !== "object") continue;
           const type = (c.type || "jump").toLowerCase();
           if (type !== "jump") continue;
-          
+
           c.target = "";
         }
       }
 
-      
       for (const l of STATE.links || []) {
         const fromNodeId = safeId(l?.from?.nodeId);
         const toNodeId = safeId(l?.to?.nodeId);
@@ -283,7 +249,6 @@
             }
           }
 
-          
           if (!matched) continue;
         }
       }
@@ -304,7 +269,6 @@
         };
       }
       if (ch[STORAGE_KEY].v !== VERSION) {
-        
         ch[STORAGE_KEY] = {
           v: VERSION,
           nodes: [],
@@ -342,10 +306,6 @@
       };
     }
 
-    
-    
-    
-
     function ensureNodesForFrames() {
       const frames = getFrames();
       const existingByFrame = new Map();
@@ -379,24 +339,21 @@
       const frames = getFrames();
       const frameIds = new Set(frames.map((f) => Number(f?.id)));
 
-      
       STATE.nodes = (STATE.nodes || []).filter((n) => {
         if (!n || n.type !== "frame") return false;
         return frameIds.has(Number(n.frameId));
       });
 
-      
       const nodeIdSet = new Set(STATE.nodes.map((n) => safeId(n.id)));
       STATE.links = (STATE.links || []).filter((l) => {
         if (!l || !l.from || !l.to) return false;
         if (!nodeIdSet.has(safeId(l.from.nodeId))) return false;
         if (!nodeIdSet.has(safeId(l.to.nodeId))) return false;
-        
+
         if (safeId(l.to.portId) !== "in") return false;
         return true;
       });
 
-      
       if (
         STATE.startFrameId != null &&
         !frameIds.has(Number(STATE.startFrameId))
@@ -423,7 +380,6 @@
       const outputs = [];
       outputs.push({ id: "next", label: "Next", kind: "next" });
 
-      
       const choices = Array.isArray(frame?.choices) ? frame.choices : [];
       for (const c of choices) {
         if (!c || typeof c !== "object") continue;
@@ -443,7 +399,6 @@
     }
 
     function validateConnection(from, to) {
-      
       if (!from || !to) return { ok: false, reason: "Invalid endpoint." };
 
       if (safeId(from.nodeId) === safeId(to.nodeId))
@@ -454,7 +409,6 @@
       if (safeId(to.portId) !== "in")
         return { ok: false, reason: "Invalid to port." };
 
-      
       const fp = safeId(from.portId);
       if (fp !== "next" && !fp.startsWith("choice:"))
         return {
@@ -462,7 +416,6 @@
           reason: "Only Next/Choice outputs are connectable.",
         };
 
-      
       const fromNode = getNode(from.nodeId);
       if (!fromNode) return { ok: false, reason: "From node missing." };
       const ports = getPortsForNode(fromNode).outputs;
@@ -494,21 +447,15 @@
     }
 
     function upsertLink(from, to) {
-      
-      
-      
       const ok = validateConnection(from, to);
       if (!ok.ok) return ok;
 
-      
       removeLinksWhere(
         (l) =>
           safeId(l?.from?.nodeId) === safeId(from.nodeId) &&
           safeId(l?.from?.portId) === safeId(from.portId),
       );
 
-      
-      
       STATE.links.push({
         id: nowId("link"),
         from: { nodeId: safeId(from.nodeId), portId: safeId(from.portId) },
@@ -522,10 +469,6 @@
       const id = safeId(linkId);
       return removeLinksWhere((l) => safeId(l?.id) === id);
     }
-
-    
-    
-    
 
     function saveToChapter(reason = "save") {
       const ch = getChapter();
@@ -555,8 +498,6 @@
         scale: Number(STATE.viewport.scale) || 1,
       };
 
-      
-      
       try {
         applyGraphLinksToFrames();
       } catch (e) {}
@@ -606,13 +547,7 @@
 
       ensureNodesForFrames();
       normalizeAgainstFrames();
-
-      
     }
-
-    
-    
-    
 
     function injectCss() {
       if (STATE._cssInjected) return;
@@ -903,7 +838,6 @@
       const overlay = document.createElement("div");
       overlay.className = "ngv2-overlay";
       overlay.addEventListener("mousedown", (e) => {
-        
         if (e.target === overlay) close();
       });
 
@@ -924,7 +858,6 @@
       const actions = document.createElement("div");
       actions.className = "ngv2-actions";
 
-      
       const btnClose = document.createElement("button");
       btnClose.textContent = "×";
       btnClose.onclick = () => close();
@@ -982,10 +915,6 @@
       setTimeout(() => el.classList.remove("show"), 1300);
     }
 
-    
-    
-    
-
     function nodeScreenRect(node) {
       const p = worldToScreen({ x: node.x, y: node.y });
       return {
@@ -997,13 +926,7 @@
     }
 
     function portWorldPos(node, side, index, count) {
-      
-      
-      
-      
-      
-      
-      const titleOffset = CFG.node.rowH; 
+      const titleOffset = CFG.node.rowH;
       const baseY =
         node.y +
         CFG.node.headerH +
@@ -1014,6 +937,50 @@
       const x = side === "in" ? node.x - 16 : node.x + CFG.node.w + 16;
 
       return { x, y };
+    }
+
+    function portScreenPosFromDom(portEl) {
+      const wrap = STATE.ui.canvasWrap;
+      if (!wrap || !portEl) return null;
+
+      const wrapRect = wrap.getBoundingClientRect();
+      const r = portEl.getBoundingClientRect();
+
+      // Anchor at the dot center if possible; otherwise fall back to the port row center.
+      const dot = portEl.querySelector(".ngv2-dot");
+      if (dot) {
+        const dr = dot.getBoundingClientRect();
+        return {
+          x: dr.left - wrapRect.left + dr.width / 2,
+          y: dr.top - wrapRect.top + dr.height / 2,
+        };
+      }
+
+      return {
+        x: r.left - wrapRect.left + r.width / 2,
+        y: r.top - wrapRect.top + r.height / 2,
+      };
+    }
+
+    function getPortElement(nodeId, portId, side) {
+      const wrap = STATE.ui.canvasWrap;
+      if (!wrap) return null;
+
+      const nid = safeId(nodeId);
+      const pid = safeId(portId);
+      const s = safeId(side);
+
+      const els = wrap.querySelectorAll("[data-port][data-node][data-side]");
+      for (const el of els) {
+        if (
+          safeId(el.getAttribute("data-node")) === nid &&
+          safeId(el.getAttribute("data-port")) === pid &&
+          safeId(el.getAttribute("data-side")) === s
+        ) {
+          return el;
+        }
+      }
+      return null;
     }
 
     function getLinkColor(portId) {
@@ -1027,7 +994,6 @@
       const svg = STATE.ui.svg;
       if (!svg) return;
 
-      
       while (svg.firstChild) svg.removeChild(svg.firstChild);
 
       const ns = "http://www.w3.org/2000/svg";
@@ -1040,18 +1006,24 @@
         const toN = nodeById.get(safeId(l?.to?.nodeId));
         if (!fromN || !toN) continue;
 
-        const fromPorts = getPortsForNode(fromN).outputs;
-        const fromIdx = Math.max(
-          0,
-          fromPorts.findIndex((p) => safeId(p.id) === safeId(l.from.portId)),
-        );
+        const fromEl = getPortElement(l.from.nodeId, l.from.portId, "out");
+        const toEl = getPortElement(l.to.nodeId, "in", "in");
 
-        const outCount = Math.max(1, fromPorts.length);
-        const p1w = portWorldPos(fromN, "out", fromIdx, outCount);
-        const p2w = portWorldPos(toN, "in", 0, 1);
+        // Prefer DOM-accurate anchors; fall back to math-based anchors if DOM isn't available yet.
+        const p1s = fromEl ? portScreenPosFromDom(fromEl) : null;
+        const p2s = toEl ? portScreenPosFromDom(toEl) : null;
 
-        const p1 = worldToScreen(p1w);
-        const p2 = worldToScreen(p2w);
+        const p1 = p1s
+          ? p1s
+          : worldToScreen(
+              portWorldPos(
+                fromN,
+                "out",
+                0,
+                Math.max(1, getPortsForNode(fromN).outputs.length),
+              ),
+            );
+        const p2 = p2s ? p2s : worldToScreen(portWorldPos(toN, "in", 0, 1));
 
         const dx = Math.max(60, Math.abs(p2.x - p1.x) * 0.45);
         const c1 = { x: p1.x + dx, y: p1.y };
@@ -1067,7 +1039,6 @@
 
         svg.appendChild(path);
 
-        
         const arrow = document.createElementNS(ns, "circle");
         arrow.setAttribute("cx", String(p2.x));
         arrow.setAttribute("cy", String(p2.y));
@@ -1077,27 +1048,28 @@
         svg.appendChild(arrow);
       }
 
-      
       if (STATE.selectingFrom && STATE._mouseWorld) {
         const fromN = nodeById.get(safeId(STATE.selectingFrom.nodeId));
         if (fromN) {
-          const fromPorts = getPortsForNode(fromN).outputs;
-          const fromIdx = Math.max(
-            0,
-            fromPorts.findIndex(
-              (p) => safeId(p.id) === safeId(STATE.selectingFrom.portId),
-            ),
+          const fromEl = getPortElement(
+            STATE.selectingFrom.nodeId,
+            STATE.selectingFrom.portId,
+            "out",
           );
 
-          const p1w = portWorldPos(
-            fromN,
-            "out",
-            fromIdx,
-            Math.max(1, fromPorts.length),
-          );
-          const p2w = STATE._mouseWorld;
-          const p1 = worldToScreen(p1w);
-          const p2 = worldToScreen(p2w);
+          const p1s = fromEl ? portScreenPosFromDom(fromEl) : null;
+          const p1 = p1s
+            ? p1s
+            : worldToScreen(
+                portWorldPos(
+                  fromN,
+                  "out",
+                  0,
+                  Math.max(1, getPortsForNode(fromN).outputs.length),
+                ),
+              );
+
+          const p2 = worldToScreen(STATE._mouseWorld);
 
           const dx = Math.max(60, Math.abs(p2.x - p1.x) * 0.45);
           const c1 = { x: p1.x + dx, y: p1.y };
@@ -1136,7 +1108,6 @@
       if (safeId(STATE.selectedNodeId) === safeId(node.id))
         el.classList.add("selected");
 
-      
       const header = document.createElement("div");
       header.className = "ngv2-nodeHeader";
 
@@ -1144,11 +1115,14 @@
       title.className = "ngv2-nodeTitle";
       const b = document.createElement("b");
 
-      
       const rawText = String(frame?.text || "")
         .trim()
         .replace(/\s+/g, " ");
-      const snippet = rawText.length > 0 ? rawText.slice(0, 15) : "";
+
+      const MAX = 25;
+      const snippet =
+        rawText.length > MAX ? rawText.slice(0, MAX) + "..." : rawText;
+
       b.textContent = snippet || "";
 
       title.appendChild(b);
@@ -1178,15 +1152,11 @@
       header.appendChild(title);
       header.appendChild(right);
 
-      
       const body = document.createElement("div");
       body.className = "ngv2-nodeBody";
 
       const ports = getPortsForNode(node);
 
-      
-      
-      
       const portsGrid = document.createElement("div");
       portsGrid.className = "ngv2-portsGrid";
 
@@ -1198,7 +1168,6 @@
       inTitle.textContent = "IN";
       inCol.appendChild(inTitle);
 
-      
       for (const pIn of ports.inputs) {
         inCol.appendChild(renderPort(node, "in", pIn));
       }
@@ -1211,7 +1180,6 @@
       outTitle.textContent = "OUT";
       outCol.appendChild(outTitle);
 
-      
       for (const pOut of ports.outputs) {
         outCol.appendChild(renderPort(node, "out", pOut));
       }
@@ -1234,14 +1202,12 @@
       el.setAttribute("data-node", safeId(node.id));
       el.setAttribute("data-side", side);
 
-      
       const dot = document.createElement("div");
       dot.className = "ngv2-dot";
       if (side === "in") dot.classList.add("in");
       if (port.kind === "next") dot.classList.add("next");
       if (port.kind === "choice") dot.classList.add("choice");
 
-      
       const label = document.createElement("div");
       label.className = "ngv2-portLabel";
       label.textContent = port.label;
@@ -1249,10 +1215,8 @@
       el.appendChild(dot);
       el.appendChild(label);
 
-      
       if (STATE.selectingFrom) {
         if (side === "in") {
-          
           const ok = validateConnection(
             {
               nodeId: STATE.selectingFrom.nodeId,
@@ -1263,11 +1227,9 @@
           if (ok.ok) el.classList.add("connectable");
           else el.classList.add("disabled");
         } else {
-          
         }
       }
 
-      
       if (
         STATE.selectingFrom &&
         side === "out" &&
@@ -1281,7 +1243,6 @@
     }
 
     function renderInspector() {
-      
       return;
     }
 
@@ -1302,19 +1263,14 @@
       const canvas = STATE.ui.canvas;
       if (!canvas) return;
 
-      
       canvas.innerHTML = "";
 
-      
       for (const node of STATE.nodes) {
         const el = renderNode(node);
         canvas.appendChild(el);
       }
 
-      
       renderLinks();
-
-      
     }
 
     function fitToContent() {
@@ -1369,7 +1325,6 @@
         (a, b) => Number(a.frameId) - Number(b.frameId),
       );
 
-      
       let x = 180;
       let yMain = 160;
       let yInstant = 360;
@@ -1382,10 +1337,6 @@
         x += CFG.node.w + 140;
       }
     }
-
-    
-    
-    
 
     function getPortFromTarget(target) {
       const el = target?.closest?.("[data-port][data-node][data-side]");
@@ -1403,7 +1354,6 @@
 
       const getClient = (e) => ({ x: e.clientX, y: e.clientY });
 
-      
       wrap.addEventListener(
         "wheel",
         (e) => {
@@ -1424,7 +1374,7 @@
           STATE.viewport.scale = nextScale;
 
           const after = screenToWorld(mouse);
-          
+
           STATE.viewport.x += (after.x - before.x) * STATE.viewport.scale;
           STATE.viewport.y += (after.y - before.y) * STATE.viewport.scale;
 
@@ -1434,11 +1384,9 @@
         { passive: false },
       );
 
-      
       wrap.addEventListener("mousedown", (e) => {
         if (!STATE.open) return;
 
-        
         if (e.button === 1) {
           e.preventDefault();
           const mouse = getClient(e);
@@ -1451,13 +1399,7 @@
           return;
         }
 
-        
-        if (
-          e.button === 0 &&
-          e.getModifierState &&
-          e.getModifierState(" " )
-        ) {
-          
+        if (e.button === 0 && e.getModifierState && e.getModifierState(" ")) {
         }
 
         const target = e.target;
@@ -1467,7 +1409,6 @@
           e.preventDefault();
           e.stopPropagation();
 
-          
           if (!STATE.selectingFrom && port.side === "in") {
             const removed = removeLinksWhere(
               (l) =>
@@ -1479,56 +1420,23 @@
               render();
               toast("Disconnected incoming links.");
             } else {
-              toast("Click an output (Next/Choice) first.");
+              toast("Drag from an output (Next/Choice) to connect.");
             }
             return;
           }
 
-          
-          if (!STATE.selectingFrom && port.side === "out") {
+          if (port.side === "out") {
+            // Drag-to-link: mousedown on OUT arms connection immediately.
+            // Mouseup on an IN port will commit the link; mouseup elsewhere cancels.
             STATE.selectingFrom = { nodeId: port.nodeId, portId: port.portId };
-            toast(`Selected: ${port.portId}`);
-            render();
-            return;
-          }
-
-          
-          if (
-            STATE.selectingFrom &&
-            port.side === "out" &&
-            safeId(STATE.selectingFrom.nodeId) === safeId(port.nodeId) &&
-            safeId(STATE.selectingFrom.portId) === safeId(port.portId)
-          ) {
-            STATE.selectingFrom = null;
-            toast("Canceled.");
-            render();
-            return;
-          }
-
-          
-          if (STATE.selectingFrom && port.side === "in") {
-            const ok = upsertLink(
-              {
-                nodeId: STATE.selectingFrom.nodeId,
-                portId: STATE.selectingFrom.portId,
-              },
-              { nodeId: port.nodeId, portId: "in" },
-            );
-            if (!ok.ok) {
-              toast(ok.reason);
-              return;
-            }
-            STATE.selectingFrom = null;
-            saveToChapter("connect");
-            render();
-            toast("Connected.");
+            STATE.drag = null; // ensure we don't start node drag
+            renderLinks();
             return;
           }
 
           return;
         }
 
-        
         const nodeEl = target.closest?.("[data-node]:not([data-port])");
         const rect = wrap.getBoundingClientRect();
         const mouse = { x: e.clientX - rect.left, y: e.clientY - rect.top };
@@ -1550,10 +1458,8 @@
           return;
         }
 
-        
         STATE.selectedNodeId = null;
 
-        
         if (STATE.selectingFrom) {
           const existing = findExistingFromLink(
             STATE.selectingFrom.nodeId,
@@ -1577,7 +1483,6 @@
         }
       });
 
-      
       window.addEventListener("mousemove", (e) => {
         if (!STATE.open) return;
 
@@ -1616,16 +1521,47 @@
         }
 
         if (STATE.selectingFrom) {
-          renderLinks(); 
+          renderLinks();
         }
       });
 
-      
-      window.addEventListener("mouseup", () => {
+      window.addEventListener("mouseup", (e) => {
         if (!STATE.open) return;
 
         const wrap = STATE.ui.canvasWrap;
         if (!wrap) return;
+
+        // Drag-to-link commit/cancel
+        if (STATE.selectingFrom) {
+          const port = getPortFromTarget(e.target);
+          if (port && port.side === "in") {
+            const ok = upsertLink(
+              {
+                nodeId: STATE.selectingFrom.nodeId,
+                portId: STATE.selectingFrom.portId,
+              },
+              { nodeId: port.nodeId, portId: "in" },
+            );
+
+            STATE.selectingFrom = null;
+
+            if (!ok.ok) {
+              toast(ok.reason);
+              render();
+              return;
+            }
+
+            saveToChapter("connect");
+            render();
+            toast("Connected.");
+            return;
+          }
+
+          // Mouseup not on an input: cancel the drag-to-link
+          STATE.selectingFrom = null;
+          render();
+          return;
+        }
 
         if (STATE.drag) {
           const mode = STATE.drag.mode;
@@ -1636,7 +1572,6 @@
         }
       });
 
-      
       window.addEventListener("keydown", (e) => {
         if (!STATE.open) return;
 
@@ -1653,7 +1588,7 @@
           if (!STATE.selectedNodeId) return;
 
           const nodeId = STATE.selectedNodeId;
-          
+
           const changed = removeLinksWhere(
             (l) =>
               safeId(l?.from?.nodeId) === safeId(nodeId) ||
@@ -1667,7 +1602,6 @@
           return;
         }
 
-        
         if ((e.ctrlKey || e.metaKey) && e.key === "0") {
           STATE.viewport.scale = 1;
           STATE.viewport.x = 0;
@@ -1677,10 +1611,6 @@
         }
       });
     }
-
-    
-    
-    
 
     function open(chapterId) {
       ensureUI();
@@ -1693,7 +1623,6 @@
 
       loadFromChapter(chapterId);
 
-      
       const ch = getChapter();
       if (STATE.ui.headerTitle) {
         STATE.ui.headerTitle.textContent =
@@ -1703,7 +1632,6 @@
       STATE.ui.overlay.style.display = "flex";
       render();
 
-      
       if (
         (!STATE.viewport.x &&
           !STATE.viewport.y &&
@@ -1730,15 +1658,12 @@
       open,
       close,
       isOpen,
-      _state: STATE, 
+      _state: STATE,
     };
   })();
 
-  
   window.NodeGraphV2 = NodeGraphV2;
 
-  
-  
   if (typeof window.openNodeGraphV2 !== "function") {
     window.openNodeGraphV2 = function () {
       if (window.NodeGraphV2 && typeof window.NodeGraphV2.open === "function") {
