@@ -1,39 +1,10 @@
 (function () {
   "use strict";
 
-  /**
-   * Storyline Node Editor V2 (modular-ish, single-file)
-   * ---------------------------------------------------
-   * Goals (per request):
-   * - V2 is the primary node editor
-   * - Graph links are source of truth (stored in chapter.graphV2)
-   * - Multiple incoming per node (input "in" can accept multiple links)
-   * - No exec ports (choices of type exec are not shown as connectable outputs)
-   * - Vanilla HTML/JS, no external deps
-   *
-   * Integration expectation:
-   * - Project globals exist: `project`, `activeChapterId`
-   * - Frames structure: chapter.frames[] with frame.id, frame.text, frame.frameType, frame.choices[]
-   * - Optional global autosave hook: window.scheduleAutoSave(reason)
-   *
-   * Storage:
-   * - chapter.graphV2 = { v:1, nodes:[{id,frameId,x,y}], links:[{id,from:{nodeId,portId},to:{nodeId,portId}}], startFrameId, viewport:{x,y,scale} }
-   *
-   * Ports:
-   * - Input:  "in"
-   * - Outputs:
-   *   - "next" (always)
-   *   * - "choice:<choiceId>" (jump choices only; stable choiceId generated if missing)
-   *
-   * Notes:
-   * - Graph links are truth for the node editor, BUT we also provide "Apply to Frames"
-   *   to sync connections into the slide/frame data used by preview:
-   *   - frame.attributes.next (used by preview flow when clicking Next)
-   *   - frame.choices[].target (jump choices)
-   */
+  
 
   const NodeGraphV2 = (() => {
-    const STORAGE_KEY = "graphV2"; // property name on chapter
+    const STORAGE_KEY = "graphV2"; 
     const VERSION = 1;
 
     const CFG = {
@@ -54,10 +25,10 @@
         hit: 18,
       },
 
-      // Use app theme CSS variables (defined in style.css :root / [data-theme="dark"])
-      // so Storyline Node Editor matches the main tool theme automatically.
+      
+      
       colors: {
-        // surfaces / text
+        
         bg: "var(--bg-app)",
         panel: "var(--bg-panel)",
         panel2: "var(--bg-secondary)",
@@ -65,16 +36,16 @@
         text: "var(--text-main)",
         muted: "var(--text-muted)",
 
-        // accents
+        
         accent: "var(--primary)",
         ok: "var(--success)",
         danger: "var(--danger)",
         warn: "var(--warning)",
 
-        // Choice color isn't in the main theme vars; keep a stable purple accent.
+        
         choice: "#a855f7",
 
-        // links (SVG accepts CSS vars)
+        
         link: "var(--primary)",
         linkSoft: "var(--slot-drag)",
         linkNext: "var(--success)",
@@ -90,18 +61,18 @@
       links: [],
       startFrameId: null,
 
-      // UX state
+      
       selectedNodeId: null,
-      selectingFrom: null, // { nodeId, portId }
-      hoverPort: null, // { nodeId, portId, side }
+      selectingFrom: null, 
+      hoverPort: null, 
       hoverNodeId: null,
       hoverLinkId: null,
 
       viewport: { x: 0, y: 0, scale: 1 },
 
-      drag: null, // { mode:"pan"|"node", nodeId?, start:{x,y}, origin:{x,y} }
+      drag: null, 
 
-      // UI
+      
       ui: {
         overlay: null,
         modal: null,
@@ -116,9 +87,9 @@
       _autosaveTimer: null,
     };
 
-    // -------------------------
-    // Utilities
-    // -------------------------
+    
+    
+    
 
     function clamp(n, a, b) {
       return Math.max(a, Math.min(b, n));
@@ -176,8 +147,8 @@
     }
 
     function ensureChoiceIds() {
-      // Graph-links truth requires stable port identifiers across sessions.
-      // We only generate IDs if missing. This mutates project data but is safe and minimal.
+      
+      
       const frames = getFrames();
       let mutated = false;
 
@@ -187,7 +158,7 @@
 
         for (const c of choices) {
           if (!c || typeof c !== "object") continue;
-          // Only relevant for jump choices (connectable)
+          
           const type = (c.type || "jump").toLowerCase();
           if (type !== "jump") continue;
 
@@ -195,13 +166,13 @@
             c.id = nowId("choice");
             mutated = true;
           } else {
-            // normalize to string
+            
             c.id = String(c.id);
           }
         }
       }
 
-      // If we mutated IDs, also re-apply the graph mapping so targets stay aligned.
+      
       if (mutated) {
         scheduleAutosave("ensure_choice_ids");
         try {
@@ -218,23 +189,23 @@
     }
 
     function applyGraphLinksToFrames() {
-      // Sync graphV2 links into frame/slide data so preview & inspector stay consistent.
-      // Policy:
-      // - For each frame:
-      //   - Clear frame.attributes.next
-      //   - Clear targets for jump choices (set to "" when not connected)
-      // - For each graph link:
-      //   - from "next" => set fromFrame.attributes.next = toFrame.id
-      //   - from "choice:<choiceId>" => set the matching choice.target = toFrame.id
-      //
-      // Notes:
-      // - We only touch jump choices (type === "jump")
-      // - We do not create new choices; we only map existing ones by stable choice.id
-      // - Exec choices are ignored (no ports)
+      
+      
+      
+      
+      
+      
+      
+      
+      
+      
+      
+      
+      
       const frames = getFrames();
       if (!frames || !frames.length) return { ok: false, reason: "No frames." };
 
-      // Build nodeId -> frameId
+      
       const nodeToFrameId = new Map();
       for (const n of STATE.nodes || []) {
         if (!n || n.type !== "frame") continue;
@@ -250,11 +221,11 @@
         frameById.set(fid, f);
       }
 
-      // Reset
+      
       for (const f of frames) {
         if (!f) continue;
         ensureFrameAttributes(f);
-        // next: store as numeric id or empty string (use empty string to match existing style)
+        
         f.attributes.next = "";
 
         const choices = Array.isArray(f.choices) ? f.choices : [];
@@ -262,12 +233,12 @@
           if (!c || typeof c !== "object") continue;
           const type = (c.type || "jump").toLowerCase();
           if (type !== "jump") continue;
-          // Ensure string target (existing editor uses string often)
+          
           c.target = "";
         }
       }
 
-      // Apply links
+      
       for (const l of STATE.links || []) {
         const fromNodeId = safeId(l?.from?.nodeId);
         const toNodeId = safeId(l?.to?.nodeId);
@@ -312,7 +283,7 @@
             }
           }
 
-          // If choice ID not found (stale port), ignore.
+          
           if (!matched) continue;
         }
       }
@@ -333,7 +304,7 @@
         };
       }
       if (ch[STORAGE_KEY].v !== VERSION) {
-        // naive reset for version mismatch (can implement migrations later)
+        
         ch[STORAGE_KEY] = {
           v: VERSION,
           nodes: [],
@@ -371,9 +342,9 @@
       };
     }
 
-    // -------------------------
-    // Model: nodes/ports/links
-    // -------------------------
+    
+    
+    
 
     function ensureNodesForFrames() {
       const frames = getFrames();
@@ -408,24 +379,24 @@
       const frames = getFrames();
       const frameIds = new Set(frames.map((f) => Number(f?.id)));
 
-      // drop nodes whose frames no longer exist
+      
       STATE.nodes = (STATE.nodes || []).filter((n) => {
         if (!n || n.type !== "frame") return false;
         return frameIds.has(Number(n.frameId));
       });
 
-      // drop links pointing to missing nodes
+      
       const nodeIdSet = new Set(STATE.nodes.map((n) => safeId(n.id)));
       STATE.links = (STATE.links || []).filter((l) => {
         if (!l || !l.from || !l.to) return false;
         if (!nodeIdSet.has(safeId(l.from.nodeId))) return false;
         if (!nodeIdSet.has(safeId(l.to.nodeId))) return false;
-        // still enforce the input port name, but allow multiple incoming links
+        
         if (safeId(l.to.portId) !== "in") return false;
         return true;
       });
 
-      // start frame
+      
       if (
         STATE.startFrameId != null &&
         !frameIds.has(Number(STATE.startFrameId))
@@ -452,7 +423,7 @@
       const outputs = [];
       outputs.push({ id: "next", label: "Next", kind: "next" });
 
-      // Jump choices only; no exec ports per requirement.
+      
       const choices = Array.isArray(frame?.choices) ? frame.choices : [];
       for (const c of choices) {
         if (!c || typeof c !== "object") continue;
@@ -472,7 +443,7 @@
     }
 
     function validateConnection(from, to) {
-      // single incoming: to must always be input "in"
+      
       if (!from || !to) return { ok: false, reason: "Invalid endpoint." };
 
       if (safeId(from.nodeId) === safeId(to.nodeId))
@@ -483,7 +454,7 @@
       if (safeId(to.portId) !== "in")
         return { ok: false, reason: "Invalid to port." };
 
-      // from must be output: next or choice
+      
       const fp = safeId(from.portId);
       if (fp !== "next" && !fp.startsWith("choice:"))
         return {
@@ -491,7 +462,7 @@
           reason: "Only Next/Choice outputs are connectable.",
         };
 
-      // ensure from port exists on that node (prevents stale links)
+      
       const fromNode = getNode(from.nodeId);
       if (!fromNode) return { ok: false, reason: "From node missing." };
       const ports = getPortsForNode(fromNode).outputs;
@@ -523,21 +494,21 @@
     }
 
     function upsertLink(from, to) {
-      // Rules:
-      // - One outgoing per (nodeId,portId): replace existing.
-      // - Multiple incoming allowed: do NOT remove other links into the same node.
+      
+      
+      
       const ok = validateConnection(from, to);
       if (!ok.ok) return ok;
 
-      // replace outgoing on same port
+      
       removeLinksWhere(
         (l) =>
           safeId(l?.from?.nodeId) === safeId(from.nodeId) &&
           safeId(l?.from?.portId) === safeId(from.portId),
       );
 
-      // NOTE: We intentionally do NOT remove existing incoming links.
-      // This allows multiple nodes to connect into the same target node.
+      
+      
       STATE.links.push({
         id: nowId("link"),
         from: { nodeId: safeId(from.nodeId), portId: safeId(from.portId) },
@@ -552,9 +523,9 @@
       return removeLinksWhere((l) => safeId(l?.id) === id);
     }
 
-    // -------------------------
-    // Persistence
-    // -------------------------
+    
+    
+    
 
     function saveToChapter(reason = "save") {
       const ch = getChapter();
@@ -584,8 +555,8 @@
         scale: Number(STATE.viewport.scale) || 1,
       };
 
-      // Keep preview/player in sync: whenever graph links change, apply into frame data.
-      // This makes node/frame/slide "work together" without requiring manual actions.
+      
+      
       try {
         applyGraphLinksToFrames();
       } catch (e) {}
@@ -636,12 +607,12 @@
       ensureNodesForFrames();
       normalizeAgainstFrames();
 
-      // Do not autosave on load.
+      
     }
 
-    // -------------------------
-    // UI
-    // -------------------------
+    
+    
+    
 
     function injectCss() {
       if (STATE._cssInjected) return;
@@ -806,7 +777,7 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 0 ${CFG.node.pad}px;
+  padding: 10px ${CFG.node.pad}px;
   border-bottom: 1px solid ${CFG.colors.border};
   background: ${CFG.colors.panel2};
   border-top-left-radius: var(--radius-xl);
@@ -846,7 +817,7 @@
 
 .ngv2-nodeBody { padding: ${CFG.node.pad}px; display:flex; flex-direction: column; gap: 8px; }
 
-/* Port grouping: inputs on the left, outputs on the right */
+
 .ngv2-portsGrid{
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -872,11 +843,11 @@
 .ngv2-portColTitle.out{ text-align: right; }
 .ngv2-portCol.out{ align-items: flex-end; }
 .ngv2-portCol.out .ngv2-port{ justify-content: flex-end; text-align: right; }
-/* Keep DOT on the far right for OUT ports (label aligns right next to it) */
+
 .ngv2-portCol.out .ngv2-dot { order: 2; }
 .ngv2-portCol.out .ngv2-portLabel { order: 1; }
 
-/* Legacy row class remains for other uses */
+
 .ngv2-row { display:flex; align-items:center; justify-content: space-between; gap: 8px; height: ${CFG.node.rowH}px; }
 
 .ngv2-port {
@@ -932,7 +903,7 @@
       const overlay = document.createElement("div");
       overlay.className = "ngv2-overlay";
       overlay.addEventListener("mousedown", (e) => {
-        // click outside modal closes
+        
         if (e.target === overlay) close();
       });
 
@@ -953,7 +924,7 @@
       const actions = document.createElement("div");
       actions.className = "ngv2-actions";
 
-      // Single-button UX: everything auto-saves; just Close when done.
+      
       const btnClose = document.createElement("button");
       btnClose.textContent = "×";
       btnClose.onclick = () => close();
@@ -1011,9 +982,9 @@
       setTimeout(() => el.classList.remove("show"), 1300);
     }
 
-    // -------------------------
-    // Rendering
-    // -------------------------
+    
+    
+    
 
     function nodeScreenRect(node) {
       const p = worldToScreen({ x: node.x, y: node.y });
@@ -1026,13 +997,13 @@
     }
 
     function portWorldPos(node, side, index, count) {
-      // ports displayed as rows in node body; align dots by row
-      //
-      // V2 note:
-      // We added IN/OUT column titles inside the node body. Those titles take up
-      // vertical space and visually shift the port rows down by ~1 "block".
-      // Offset the link anchors down by 1 row so link lines line up with the ports.
-      const titleOffset = CFG.node.rowH; // "1 block"
+      
+      
+      
+      
+      
+      
+      const titleOffset = CFG.node.rowH; 
       const baseY =
         node.y +
         CFG.node.headerH +
@@ -1056,7 +1027,7 @@
       const svg = STATE.ui.svg;
       if (!svg) return;
 
-      // clear
+      
       while (svg.firstChild) svg.removeChild(svg.firstChild);
 
       const ns = "http://www.w3.org/2000/svg";
@@ -1096,7 +1067,7 @@
 
         svg.appendChild(path);
 
-        // (optional) simple arrow head
+        
         const arrow = document.createElementNS(ns, "circle");
         arrow.setAttribute("cx", String(p2.x));
         arrow.setAttribute("cy", String(p2.y));
@@ -1106,7 +1077,7 @@
         svg.appendChild(arrow);
       }
 
-      // ghost link (armed)
+      
       if (STATE.selectingFrom && STATE._mouseWorld) {
         const fromN = nodeById.get(safeId(STATE.selectingFrom.nodeId));
         if (fromN) {
@@ -1165,19 +1136,22 @@
       if (safeId(STATE.selectedNodeId) === safeId(node.id))
         el.classList.add("selected");
 
-      // header
+      
       const header = document.createElement("div");
       header.className = "ngv2-nodeHeader";
 
       const title = document.createElement("div");
       title.className = "ngv2-nodeTitle";
       const b = document.createElement("b");
-      const label = `#${frame?.id ?? node.frameId}`;
-      b.textContent = label || `Frame ${node.frameId}`;
-      const s = document.createElement("span");
-      s.textContent = `Type: ${frameType(frame)}`;
+
+      
+      const rawText = String(frame?.text || "")
+        .trim()
+        .replace(/\s+/g, " ");
+      const snippet = rawText.length > 0 ? rawText.slice(0, 15) : "";
+      b.textContent = snippet || "";
+
       title.appendChild(b);
-      title.appendChild(s);
 
       const right = document.createElement("div");
       right.style.display = "flex";
@@ -1204,15 +1178,15 @@
       header.appendChild(title);
       header.appendChild(right);
 
-      // body
+      
       const body = document.createElement("div");
       body.className = "ngv2-nodeBody";
 
       const ports = getPortsForNode(node);
 
-      // Ports grouped into two columns:
-      // - IN on the left
-      // - OUT on the right
+      
+      
+      
       const portsGrid = document.createElement("div");
       portsGrid.className = "ngv2-portsGrid";
 
@@ -1224,7 +1198,7 @@
       inTitle.textContent = "IN";
       inCol.appendChild(inTitle);
 
-      // Inputs (currently only one: "in")
+      
       for (const pIn of ports.inputs) {
         inCol.appendChild(renderPort(node, "in", pIn));
       }
@@ -1237,7 +1211,7 @@
       outTitle.textContent = "OUT";
       outCol.appendChild(outTitle);
 
-      // Outputs (Next + Jump Choices)
+      
       for (const pOut of ports.outputs) {
         outCol.appendChild(renderPort(node, "out", pOut));
       }
@@ -1260,14 +1234,14 @@
       el.setAttribute("data-node", safeId(node.id));
       el.setAttribute("data-side", side);
 
-      // dot
+      
       const dot = document.createElement("div");
       dot.className = "ngv2-dot";
       if (side === "in") dot.classList.add("in");
       if (port.kind === "next") dot.classList.add("next");
       if (port.kind === "choice") dot.classList.add("choice");
 
-      // label
+      
       const label = document.createElement("div");
       label.className = "ngv2-portLabel";
       label.textContent = port.label;
@@ -1275,10 +1249,10 @@
       el.appendChild(dot);
       el.appendChild(label);
 
-      // connectable/disabled hinting when armed
+      
       if (STATE.selectingFrom) {
         if (side === "in") {
-          // can we connect from selectingFrom to this node?
+          
           const ok = validateConnection(
             {
               nodeId: STATE.selectingFrom.nodeId,
@@ -1289,11 +1263,11 @@
           if (ok.ok) el.classList.add("connectable");
           else el.classList.add("disabled");
         } else {
-          // outputs are not targets while armed
+          
         }
       }
 
-      // selected output highlight
+      
       if (
         STATE.selectingFrom &&
         side === "out" &&
@@ -1307,7 +1281,7 @@
     }
 
     function renderInspector() {
-      // Inspector panel removed (single-surface UX).
+      
       return;
     }
 
@@ -1328,19 +1302,19 @@
       const canvas = STATE.ui.canvas;
       if (!canvas) return;
 
-      // clear
+      
       canvas.innerHTML = "";
 
-      // render nodes
+      
       for (const node of STATE.nodes) {
         const el = renderNode(node);
         canvas.appendChild(el);
       }
 
-      // links overlay
+      
       renderLinks();
 
-      // inspector removed
+      
     }
 
     function fitToContent() {
@@ -1395,7 +1369,7 @@
         (a, b) => Number(a.frameId) - Number(b.frameId),
       );
 
-      // Simple layout: main frames in a row, instant frames slightly below.
+      
       let x = 180;
       let yMain = 160;
       let yInstant = 360;
@@ -1409,9 +1383,9 @@
       }
     }
 
-    // -------------------------
-    // Events
-    // -------------------------
+    
+    
+    
 
     function getPortFromTarget(target) {
       const el = target?.closest?.("[data-port][data-node][data-side]");
@@ -1429,7 +1403,7 @@
 
       const getClient = (e) => ({ x: e.clientX, y: e.clientY });
 
-      // Zoom
+      
       wrap.addEventListener(
         "wheel",
         (e) => {
@@ -1450,7 +1424,7 @@
           STATE.viewport.scale = nextScale;
 
           const after = screenToWorld(mouse);
-          // keep world point under cursor stable
+          
           STATE.viewport.x += (after.x - before.x) * STATE.viewport.scale;
           STATE.viewport.y += (after.y - before.y) * STATE.viewport.scale;
 
@@ -1460,11 +1434,11 @@
         { passive: false },
       );
 
-      // Mouse down
+      
       wrap.addEventListener("mousedown", (e) => {
         if (!STATE.open) return;
 
-        // middle mouse pans
+        
         if (e.button === 1) {
           e.preventDefault();
           const mouse = getClient(e);
@@ -1477,13 +1451,13 @@
           return;
         }
 
-        // space + left pans
+        
         if (
           e.button === 0 &&
           e.getModifierState &&
-          e.getModifierState(" " /* not reliable */)
+          e.getModifierState(" " )
         ) {
-          // Not all browsers expose "Space" this way; we also handle keydown.
+          
         }
 
         const target = e.target;
@@ -1493,7 +1467,7 @@
           e.preventDefault();
           e.stopPropagation();
 
-          // Input click when not armed: if has incoming, remove ALL incoming links into this node.
+          
           if (!STATE.selectingFrom && port.side === "in") {
             const removed = removeLinksWhere(
               (l) =>
@@ -1510,7 +1484,7 @@
             return;
           }
 
-          // Output click arms
+          
           if (!STATE.selectingFrom && port.side === "out") {
             STATE.selectingFrom = { nodeId: port.nodeId, portId: port.portId };
             toast(`Selected: ${port.portId}`);
@@ -1518,7 +1492,7 @@
             return;
           }
 
-          // Clicking same output cancels
+          
           if (
             STATE.selectingFrom &&
             port.side === "out" &&
@@ -1531,7 +1505,7 @@
             return;
           }
 
-          // Armed + click input => connect
+          
           if (STATE.selectingFrom && port.side === "in") {
             const ok = upsertLink(
               {
@@ -1554,7 +1528,7 @@
           return;
         }
 
-        // Node drag
+        
         const nodeEl = target.closest?.("[data-node]:not([data-port])");
         const rect = wrap.getBoundingClientRect();
         const mouse = { x: e.clientX - rect.left, y: e.clientY - rect.top };
@@ -1576,10 +1550,10 @@
           return;
         }
 
-        // empty space
+        
         STATE.selectedNodeId = null;
 
-        // if armed and click empty space: if there is an existing outgoing link, remove it; else cancel
+        
         if (STATE.selectingFrom) {
           const existing = findExistingFromLink(
             STATE.selectingFrom.nodeId,
@@ -1603,7 +1577,7 @@
         }
       });
 
-      // Mouse move
+      
       window.addEventListener("mousemove", (e) => {
         if (!STATE.open) return;
 
@@ -1642,11 +1616,11 @@
         }
 
         if (STATE.selectingFrom) {
-          renderLinks(); // update ghost without full DOM rebuild
+          renderLinks(); 
         }
       });
 
-      // Mouse up
+      
       window.addEventListener("mouseup", () => {
         if (!STATE.open) return;
 
@@ -1662,7 +1636,7 @@
         }
       });
 
-      // Keydown
+      
       window.addEventListener("keydown", (e) => {
         if (!STATE.open) return;
 
@@ -1679,7 +1653,7 @@
           if (!STATE.selectedNodeId) return;
 
           const nodeId = STATE.selectedNodeId;
-          // delete incoming + outgoing links for selected node
+          
           const changed = removeLinksWhere(
             (l) =>
               safeId(l?.from?.nodeId) === safeId(nodeId) ||
@@ -1693,7 +1667,7 @@
           return;
         }
 
-        // Ctrl+0 reset zoom
+        
         if ((e.ctrlKey || e.metaKey) && e.key === "0") {
           STATE.viewport.scale = 1;
           STATE.viewport.x = 0;
@@ -1704,9 +1678,9 @@
       });
     }
 
-    // -------------------------
-    // Public API
-    // -------------------------
+    
+    
+    
 
     function open(chapterId) {
       ensureUI();
@@ -1719,7 +1693,7 @@
 
       loadFromChapter(chapterId);
 
-      // Title
+      
       const ch = getChapter();
       if (STATE.ui.headerTitle) {
         STATE.ui.headerTitle.textContent =
@@ -1729,7 +1703,7 @@
       STATE.ui.overlay.style.display = "flex";
       render();
 
-      // Start in a good view if viewport is default
+      
       if (
         (!STATE.viewport.x &&
           !STATE.viewport.y &&
@@ -1756,15 +1730,15 @@
       open,
       close,
       isOpen,
-      _state: STATE, // for debugging
+      _state: STATE, 
     };
   })();
 
-  // expose globally
+  
   window.NodeGraphV2 = NodeGraphV2;
 
-  // Optional helper function for UI binding
-  // You can call `openNodeGraphV2()` from your menus if desired.
+  
+  
   if (typeof window.openNodeGraphV2 !== "function") {
     window.openNodeGraphV2 = function () {
       if (window.NodeGraphV2 && typeof window.NodeGraphV2.open === "function") {

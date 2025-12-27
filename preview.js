@@ -3,8 +3,8 @@ let previousCharRects = new Map();
 let typingTimer = null;
 let lastMainFrameIndex = -1;
 
-// Legacy "choice -> instant -> return to main timeline" state removed.
-// Preview progression is now driven only by explicit graph connections (Next / Choice targets).
+
+
 
 function updatePreviewRatio() {
   const vp = document.getElementById("pViewport");
@@ -248,14 +248,14 @@ function nextPreview() {
   const chapter = getChapter();
   const currentFrame = chapter.frames[previewCurrentIndex];
 
-  // If this frame has choices, user must pick a choice (click-to-advance is blocked).
+  
   if (currentFrame && currentFrame.choices && currentFrame.choices.length > 0)
     return;
 
   const isInstant = currentFrame && currentFrame.frameType === "instant";
 
-  // No timeline fallback: instant frames also require an explicit Next connection.
-  // If there is no Next, the preview ends.
+  
+  
   if (isInstant) {
     const nextId =
       currentFrame &&
@@ -291,9 +291,9 @@ function nextPreview() {
     return;
   }
 
-  // NEW FLOW RULE:
-  // No more automatic "next frame by array order".
-  // Only advance if there is an explicit Next link from the Node Editor V2.
+  
+  
+  
   const nextId =
     currentFrame &&
     currentFrame.attributes &&
@@ -301,7 +301,7 @@ function nextPreview() {
     String(currentFrame.attributes.next).trim();
 
   if (!nextId) {
-    // No explicit connection => end preview immediately.
+    
     closeModal("previewModal");
     window.removeEventListener("resize", updatePreviewRatio);
     if (typingTimer) clearTimeout(typingTimer);
@@ -328,7 +328,7 @@ function nextPreview() {
   renderPreviewFrame();
 }
 
-// prevPreview() removed: previous-frame navigation UI has been removed.
+
 
 function handleChoiceClick(choice) {
   if (choice.type === "jump") {
@@ -337,9 +337,9 @@ function handleChoiceClick(choice) {
     const targetIdx = chapter.frames.findIndex((f) => f.id === targetId);
 
     if (targetIdx !== -1) {
-      // No "return to main timeline" behavior anymore.
-      // After taking a choice, the preview can only continue if the target frame
-      // (or subsequent frames) have an explicit Next connection.
+      
+      
+      
       previewCurrentIndex = targetIdx;
       renderPreviewFrame();
     } else {

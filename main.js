@@ -44,17 +44,13 @@ let project = {
   ],
 };
 
-/**
- * Project auto-save/restore (refresh-safe) via localStorage
- * - Stores project graph + editor selection state (chapter/frame/slot/tab)
- * - Versioned payload to allow future migrations
- */
+
 const VN_LOCAL_PROJECT_KEY = "vnEditorProject_v1";
 const VN_LOCAL_PROJECT_VERSION = 1;
 
 let __saveTimer = null;
 function scheduleAutoSave(reason = "") {
-  // Debounce frequent edits (dragging, typing) to reduce localStorage churn
+  
   if (__saveTimer) clearTimeout(__saveTimer);
   __saveTimer = setTimeout(() => {
     try {
@@ -76,12 +72,12 @@ function scheduleAutoSave(reason = "") {
       };
       localStorage.setItem(VN_LOCAL_PROJECT_KEY, JSON.stringify(payload));
     } catch (e) {
-      // quota/full or blocked; ignore to avoid breaking editor flow
+      
     }
   }, 200);
 }
 
-// Expose autosave globally so other modules (e.g. NodeGraph) can trigger refresh-safe saves
+
 try {
   window.scheduleAutoSave = scheduleAutoSave;
 } catch (e) {}
@@ -714,7 +710,7 @@ function renderInspector() {
   const execEl = container.querySelector("#details-exec");
   const execOpen = execEl ? execEl.hasAttribute("open") : true;
 
-  // Per-choice expand/collapse state (persisted across renders)
+  
   const choiceOpenMap = {};
   container
     .querySelectorAll("[data-choice-open]")
@@ -1382,7 +1378,7 @@ function openModal(id) {
 }
 
 function closeModal(id) {
-  // Special handling for settings modal - should use cancelSettings() instead
+  
   if (id === "settingsModal" && typeof cancelSettings === "function") {
     cancelSettings();
     return;
@@ -1583,11 +1579,11 @@ function renderChapterMgmt() {
 }
 
 function init() {
-  // Attempt restore before first render
+  
   tryRestoreFromLocalStorage();
 
   renderCastPalette();
-  // Load active chapter if possible; otherwise default to 1
+  
   loadChapter(activeChapterId || 1);
 
   if (!project.assets.backgrounds.length)
@@ -1623,7 +1619,7 @@ function init() {
   renderFilmstrip();
   renderStage();
 
-  // Save once after initial hydrate to normalize the payload (and ensure key exists)
+  
   scheduleAutoSave("init");
 
   if (typeof initSettingsModal === "function") {

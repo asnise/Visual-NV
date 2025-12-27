@@ -363,14 +363,14 @@
     e.target.value = "";
   };
 
-  // Node Editor: V2 is the primary entry point.
-  // We keep `openNodeGraph()` for backward compatibility but route it to V2.
+  
+  
   window.openNodeGraph = function () {
     window.openNodeGraphV2();
   };
 
-  // Storyline Node Editor V2 (new UX/UI)
-  // Loads `node-graph-v2.js` on demand and opens it for the active chapter.
+  
+  
   window.openNodeGraphV2 = function () {
     if (window.NodeGraphV2 && typeof window.NodeGraphV2.open === "function") {
       window.NodeGraphV2.open(
@@ -404,7 +404,7 @@
     showToast("Node Graph V2 is not available", "error");
   };
 
-  // Optional: add a simple hotkey (Shift+G) to open V2 quickly
+  
   window.addEventListener("keydown", (e) => {
     if (e.shiftKey && (e.key === "G" || e.key === "g")) {
       window.openNodeGraphV2();

@@ -6,7 +6,7 @@ let appSettings = {
   hwAccel: true,
 };
 
-let originalSettings = null; // Store original settings for cancellation
+let originalSettings = null; 
 
 function loadSettings() {
   const stored = localStorage.getItem("vnEditorSettings");
@@ -21,7 +21,7 @@ function loadSettings() {
 }
 
 function openSettingsModal() {
-  // Store original settings before opening modal
+  
   originalSettings = { ...appSettings };
 
   document.getElementById("settingTheme").value = appSettings.theme;
@@ -32,7 +32,7 @@ function openSettingsModal() {
   document.getElementById("settingTransitions").checked =
     appSettings.transitions;
 
-  // Add event listener for live theme preview
+  
   const themeSelect = document.getElementById("settingTheme");
   themeSelect.addEventListener("change", previewThemeChange);
 
@@ -40,23 +40,23 @@ function openSettingsModal() {
 }
 
 function previewThemeChange(e) {
-  // Apply theme change immediately for preview
+  
   appSettings.theme = e.target.value;
   applyEffects();
 
-  // Notify Node Graph to update its theme
+  
   if (typeof window.NodeGraph !== "undefined" && window.NodeGraph.updateTheme) {
     window.NodeGraph.updateTheme();
   }
 }
 
 function cancelSettings() {
-  // Revert to original settings
+  
   if (originalSettings) {
     appSettings = { ...originalSettings };
     applyEffects();
 
-    // Notify Node Graph to update its theme
+    
     if (
       typeof window.NodeGraph !== "undefined" &&
       window.NodeGraph.updateTheme
@@ -65,16 +65,16 @@ function cancelSettings() {
     }
   }
 
-  // Remove event listener
+  
   const themeSelect = document.getElementById("settingTheme");
   themeSelect.removeEventListener("change", previewThemeChange);
 
-  // Close modal directly to avoid infinite loop
+  
   document.getElementById("settingsModal").style.display = "none";
 }
 
 function saveAndApplySettings() {
-  // Update all settings
+  
   appSettings.theme = document.getElementById("settingTheme").value;
   appSettings.uiScale = parseFloat(
     document.getElementById("settingUIScale").value,
@@ -86,7 +86,7 @@ function saveAndApplySettings() {
   appSettings.transitions =
     document.getElementById("settingTransitions").checked;
 
-  // Save to localStorage
+  
   try {
     localStorage.setItem("vnEditorSettings", JSON.stringify(appSettings));
   } catch (e) {
@@ -95,16 +95,16 @@ function saveAndApplySettings() {
 
   applyEffects();
 
-  // Notify Node Graph to update its theme
+  
   if (typeof window.NodeGraph !== "undefined" && window.NodeGraph.updateTheme) {
     window.NodeGraph.updateTheme();
   }
 
-  // Remove event listener
+  
   const themeSelect = document.getElementById("settingTheme");
   themeSelect.removeEventListener("change", previewThemeChange);
 
-  // Close modal directly
+  
   document.getElementById("settingsModal").style.display = "none";
 
   if (typeof showToast === "function") {
