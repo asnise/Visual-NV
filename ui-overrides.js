@@ -47,7 +47,6 @@
       justify-content: flex-end;
       gap: 10px;
     }
-    /* Loading Modal */
     .loading-modal {
       position: fixed;
       top: 0;
@@ -89,7 +88,6 @@
       100% { transform: rotate(360deg); }
     }
 
-    /* Node Editor: Start & End Nodes */
     .node-header.type-start {
       background: var(--success);
       color: white;
@@ -480,4 +478,136 @@
       window.openNodeGraphV2();
     }
   });
+
+  function ensureRotateOverlay() {
+    if (document.querySelector(".rotate-to-landscape")) return;
+    const el = document.createElement("div");
+    el.className = "rotate-to-landscape";
+    el.setAttribute("aria-hidden", "true");
+    el.innerHTML = `
+      <div style="max-width:520px; padding:20px; border-radius:10px; background:rgba(0,0,0,0.6);">
+        <div style="font-size:20px; font-weight:600; margin-bottom:8px">Rotate your device</div>
+        <div style="font-size:14px; opacity:0.95">For best experience this editor is optimized for landscape (LANspace) layout. Please rotate your device to landscape or use a wider screen.</div>
+      </div>
+    `;
+    document.body.appendChild(el);
+  }
+
+  function updateLandscapeOverlay() {
+    ensureRotateOverlay();
+    const overlay = document.querySelector(".rotate-to-landscape");
+    if (!overlay) return;
+    const shouldShow = window.innerWidth <= 800 && window.matchMedia("(orientation: portrait)").matches;
+    overlay.style.display = shouldShow ? "flex" : "none";
+    overlay.style.alignItems = "center";
+    overlay.style.justifyContent = "center";
+    overlay.style.textAlign = "center";
+    if (shouldShow) {
+      overlay.setAttribute("role", "dialog");
+      overlay.setAttribute("aria-label", "Rotate to landscape");
+      document.body.classList.add("mobile-overlay-active");
+    } else {
+      overlay.removeAttribute("role");
+      overlay.removeAttribute("aria-label");
+      document.body.classList.remove("mobile-overlay-active");
+    }
+  }
+
+  function createMobilePanelToggle() {
+    const header = document.querySelector("header");
+    if (!header) return;
+    const actions = header.querySelector(".actions");
+    if (!actions) return;
+    if (document.getElementById("mobilePanelToggle")) return;
+    const btn = document.createElement("button");
+    btn.id = "mobilePanelToggle";
+    btn.style.marginRight = "8px";
+    btn.setAttribute("aria-label", "Toggle side panels");
+    btn.textContent = "Inspector";
+    btn.className = "primary-btn";
+    btn.onclick = () => {
+      document.body.classList.toggle("mobile-panels-hidden");
+    };
+    actions.insertBefore(btn, actions.firstChild);
+  }
+
+  try {
+    createMobilePanelToggle();
+    updateLandscapeOverlay();
+    window.addEventListener("resize", updateLandscapeOverlay);
+    window.addEventListener("orientationchange", updateLandscapeOverlay);
+  } catch (err) {
+    console.warn("Mobile helpers init failed", err);
+  }
+
+  function initMobileNav() {
+    if (document.getElementById('mobileMenuBtn')) return;
+
+    const header = document.querySelector('header');
+    const menuBar = document.querySelector('.menu-bar');
+
+    if (!header || !menuBar) return;
+
+    const burgerBtn = document.createElement('button');
+    burgerBtn.id = 'mobileMenuBtn';
+    burgerBtn.innerHTML = '&#9776;';
+    burgerBtn.setAttribute('aria-label', 'Toggle Menu');
+
+    header.insertBefore(burgerBtn, menuBar);
+
+    burgerBtn.addEventListener('click', function(e) {
+        e.stopPropagation();
+        menuBar.classList.toggle('show-mobile');
+        
+        if (!menuBar.classList.contains('show-mobile')) {
+            document.querySelectorAll('.dropdown-content').forEach(el => {
+                el.classList.remove('mobile-expanded');
+            });
+        }
+    });
+
+    const menuItems = document.querySelectorAll('.menu-item');
+
+    menuItems.forEach(item => {
+        item.addEventListener('click', function(e) {
+            if (window.innerWidth > 1024) return;
+
+            const dropdown = this.querySelector('.dropdown-content');
+            if (!dropdown) return;
+
+            if (e.target.tagName === 'BUTTON' || e.target.tagName === 'INPUT') {
+                setTimeout(() => {
+                    menuBar.classList.remove('show-mobile');
+                    dropdown.classList.remove('mobile-expanded');
+                }, 100);
+                return;
+            }
+
+            const wasOpen = dropdown.classList.contains('mobile-expanded');
+            
+            document.querySelectorAll('.dropdown-content').forEach(el => {
+                el.classList.remove('mobile-expanded');
+            });
+
+            if (!wasOpen) {
+                dropdown.classList.add('mobile-expanded');
+            }
+        });
+    });
+
+    document.addEventListener('click', function(e) {
+        if (window.innerWidth <= 1024) {
+            if (!menuBar.contains(e.target) && e.target !== burgerBtn) {
+                menuBar.classList.remove('show-mobile');
+            }
+        }
+    });
+  }
+
+  if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', initMobileNav);
+  } else {
+      initMobileNav();
+  }
+
 })();
