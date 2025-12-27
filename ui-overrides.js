@@ -138,6 +138,7 @@
     el.classList.remove("visible");
   }
 
+  window.showToast = showToast;
   window.showLoading = showLoading;
   window.hideLoading = hideLoading;
 

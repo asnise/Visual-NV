@@ -241,8 +241,10 @@ function openPreview() {
     const g = ch ? ch.graphV2 || ch["graphV2"] : null;
     if (!g || !g.startFrameId || !g.endFrameId) {
       if (typeof showToast === "function")
+      {
         showToast("Please set Start and End in Storyline Node Editor", "error");
-      return;
+      }
+        return;
     }
 
     // Build node id map to test reachability
