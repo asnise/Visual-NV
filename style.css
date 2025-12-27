@@ -55,13 +55,11 @@
     --warning: #ffa726;
 }
 
-
 html,
 body {
     -webkit-user-select: none;
     user-select: none;
 }
-
 
 input,
 textarea,

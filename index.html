@@ -19,6 +19,7 @@
                 <div class="menu-item">
                     File
                     <div class="dropdown-content">
+                        <button onclick="newProject()">New Project</button>
                         <button
                             onclick="
                                 document.getElementById('importInput').click()
@@ -116,24 +117,28 @@
                             data-slot="0"
                             ondrop="drop(event)"
                             ondragover="allowDrop(event)"
+                            ondragleave="handleDragLeave(event)"
                         ></div>
                         <div
                             class="slot-zone"
                             data-slot="1"
                             ondrop="drop(event)"
                             ondragover="allowDrop(event)"
+                            ondragleave="handleDragLeave(event)"
                         ></div>
                         <div
                             class="slot-zone"
                             data-slot="2"
                             ondrop="drop(event)"
                             ondragover="allowDrop(event)"
+                            ondragleave="handleDragLeave(event)"
                         ></div>
                         <div
                             class="slot-zone"
                             data-slot="3"
                             ondrop="drop(event)"
                             ondragover="allowDrop(event)"
+                            ondragleave="handleDragLeave(event)"
                         ></div>
 
                         <div
@@ -187,6 +192,11 @@
                 <div class="panel-header">Properties</div>
                 <div id="inspectorContent" class="inspector-content"></div>
             </div>
+        </div>
+
+        <div id="loadingModal" class="loading-modal">
+            <div class="spinner"></div>
+            <div id="loadingText">Processing...</div>
         </div>
 
         <div id="characterModal" class="modal-overlay">

@@ -52,6 +52,7 @@
       nodes: [],
       links: [],
       startFrameId: null,
+      endFrameId: null,
 
       selectedNodeId: null,
       selectingFrom: null,
@@ -253,6 +254,21 @@
         }
       }
 
+      // determine start/end markers from links involving special nodes
+      try {
+        let start = null;
+        let end = null;
+        const nodeById = new Map(STATE.nodes.map((n) => [safeId(n.id), n]));
+        for (const l of STATE.links || []) {
+          const fromN = nodeById.get(safeId(l?.from?.nodeId));
+          const toN = nodeById.get(safeId(l?.to?.nodeId));
+          if (fromN && fromN.type === "start" && toN && toN.type === "frame") start = Number(toN.frameId);
+          if (toN && toN.type === "end" && fromN && fromN.type === "frame") end = Number(fromN.frameId);
+        }
+        STATE.startFrameId = start != null ? start : STATE.startFrameId;
+        STATE.endFrameId = end != null ? end : STATE.endFrameId;
+      } catch (e) {}
+
       scheduleAutosave("node_graph_v2:apply_to_frames");
       return { ok: true, reason: "" };
     }
@@ -265,6 +281,7 @@
           nodes: [],
           links: [],
           startFrameId: null,
+          endFrameId: null,
           viewport: { x: 0, y: 0, scale: 1 },
         };
       }
@@ -274,6 +291,7 @@
           nodes: [],
           links: [],
           startFrameId: null,
+          endFrameId: null,
           viewport: { x: 0, y: 0, scale: 1 },
         };
       }
@@ -339,9 +357,12 @@
       const frames = getFrames();
       const frameIds = new Set(frames.map((f) => Number(f?.id)));
 
+      // Keep non-frame nodes (start/end) and only validate frame nodes against frames
       STATE.nodes = (STATE.nodes || []).filter((n) => {
-        if (!n || n.type !== "frame") return false;
-        return frameIds.has(Number(n.frameId));
+        if (!n) return false;
+        if (n.type && n.type !== "frame") return true;
+        if (n.type === "frame") return frameIds.has(Number(n.frameId));
+        return false;
       });
 
       const nodeIdSet = new Set(STATE.nodes.map((n) => safeId(n.id)));
@@ -359,6 +380,8 @@
         !frameIds.has(Number(STATE.startFrameId))
       )
         STATE.startFrameId = null;
+      if (STATE.endFrameId != null && !frameIds.has(Number(STATE.endFrameId)))
+        STATE.endFrameId = null;
     }
 
     function getNode(nodeId) {
@@ -372,30 +395,42 @@
     }
 
     function getPortsForNode(node) {
-      if (!node || node.type !== "frame") return { inputs: [], outputs: [] };
-      const frame = getFrameById(node.frameId);
+      if (!node || !node.type) return { inputs: [], outputs: [] };
+      if (node.type === "frame") {
+        const frame = getFrameById(node.frameId);
 
-      const inputs = [{ id: "in", label: "In", kind: "in" }];
+        const inputs = [{ id: "in", label: "In", kind: "in" }];
 
-      const outputs = [];
-      outputs.push({ id: "next", label: "Next", kind: "next" });
+        const outputs = [];
+        outputs.push({ id: "next", label: "Next", kind: "next" });
 
-      const choices = Array.isArray(frame?.choices) ? frame.choices : [];
-      for (const c of choices) {
-        if (!c || typeof c !== "object") continue;
-        const type = (c.type || "jump").toLowerCase();
-        if (type !== "jump") continue;
+        const choices = Array.isArray(frame?.choices) ? frame.choices : [];
+        for (const c of choices) {
+          if (!c || typeof c !== "object") continue;
+          const type = (c.type || "jump").toLowerCase();
+          if (type !== "jump") continue;
 
-        const cid = safeId(c.id);
-        const text = String(c.text || "Choice").trim();
-        outputs.push({
-          id: `choice:${cid}`,
-          label: `Choice: ${text || "(empty)"}`,
-          kind: "choice",
-        });
+          const cid = safeId(c.id);
+          const text = String(c.text || "Choice").trim();
+          outputs.push({
+            id: `choice:${cid}`,
+            label: `Choice: ${text || "(empty)"}`,
+            kind: "choice",
+          });
+        }
+
+        return { inputs, outputs };
       }
 
-      return { inputs, outputs };
+      if (node.type === "start") {
+        return { inputs: [], outputs: [{ id: "next", label: "Out", kind: "next" }] };
+      }
+
+      if (node.type === "end") {
+        return { inputs: [{ id: "in", label: "In", kind: "in" }], outputs: [] };
+      }
+
+      return { inputs: [], outputs: [] };
     }
 
     function validateConnection(from, to) {
@@ -449,7 +484,6 @@
     function upsertLink(from, to) {
       const ok = validateConnection(from, to);
       if (!ok.ok) return ok;
-
       removeLinksWhere(
         (l) =>
           safeId(l?.from?.nodeId) === safeId(from.nodeId) &&
@@ -462,12 +496,34 @@
         to: { nodeId: safeId(to.nodeId), portId: "in" },
       });
 
+      recomputeStartEndFromLinks();
+
       return { ok: true, reason: "" };
     }
 
     function deleteLink(linkId) {
       const id = safeId(linkId);
-      return removeLinksWhere((l) => safeId(l?.id) === id);
+      const changed = removeLinksWhere((l) => safeId(l?.id) === id);
+      if (changed) recomputeStartEndFromLinks();
+      return changed;
+    }
+
+    function recomputeStartEndFromLinks() {
+      let start = null;
+      let end = null;
+      const nodeById = new Map(STATE.nodes.map((n) => [safeId(n.id), n]));
+      for (const l of STATE.links) {
+        const fromN = nodeById.get(safeId(l?.from?.nodeId));
+        const toN = nodeById.get(safeId(l?.to?.nodeId));
+        if (fromN && fromN.type === "start" && toN && toN.type === "frame") {
+          start = Number(toN.frameId);
+        }
+        if (toN && toN.type === "end" && fromN && fromN.type === "frame") {
+          end = Number(fromN.frameId);
+        }
+      }
+      STATE.startFrameId = start != null ? start : null;
+      STATE.endFrameId = end != null ? end : null;
     }
 
     function saveToChapter(reason = "save") {
@@ -478,8 +534,8 @@
 
       g.nodes = (STATE.nodes || []).map((n) => ({
         id: safeId(n.id),
-        type: "frame",
-        frameId: Number(n.frameId),
+        type: safeId(n.type) || "frame",
+        frameId: n.type === "frame" ? Number(n.frameId) : null,
         x: Number(n.x) || 0,
         y: Number(n.y) || 0,
       }));
@@ -492,6 +548,7 @@
 
       g.startFrameId =
         STATE.startFrameId != null ? Number(STATE.startFrameId) : null;
+      g.endFrameId = STATE.endFrameId != null ? Number(STATE.endFrameId) : null;
       g.viewport = {
         x: Number(STATE.viewport.x) || 0,
         y: Number(STATE.viewport.y) || 0,
@@ -517,8 +574,8 @@
 
       STATE.nodes = (g.nodes || []).map((n) => ({
         id: safeId(n.id) || nowId("node"),
-        type: "frame",
-        frameId: Number(n.frameId),
+        type: safeId(n.type) || "frame",
+        frameId: n.frameId != null ? Number(n.frameId) : null,
         x: Number(n.x) || 200,
         y: Number(n.y) || 140,
       }));
@@ -534,6 +591,7 @@
 
       STATE.startFrameId =
         g.startFrameId != null ? Number(g.startFrameId) : null;
+      STATE.endFrameId = g.endFrameId != null ? Number(g.endFrameId) : null;
 
       if (g.viewport && typeof g.viewport === "object") {
         STATE.viewport.x = Number(g.viewport.x) || 0;
@@ -547,6 +605,7 @@
 
       ensureNodesForFrames();
       normalizeAgainstFrames();
+      ensureStartEndNodes();
     }
 
     function injectCss() {
@@ -719,6 +778,9 @@
   border-top-right-radius: var(--radius-xl);
 }
 
+.ngv2-nodeHeader.type-start { background: var(--success); color: white; }
+.ngv2-nodeHeader.type-end { background: var(--danger); color: white; }
+
 .ngv2-nodeTitle {
   display:flex;
   flex-direction: column;
@@ -747,7 +809,8 @@
   background: rgba(255,255,255,0.06);
   color: ${CFG.colors.text};
 }
-.ngv2-badge.start { border-color: rgba(34,197,94,0.5); background: rgba(34,197,94,0.12); }
+  .ngv2-badge.start { border-color: rgba(34,197,94,0.5); background: rgba(34,197,94,0.12); }
+  .ngv2-badge.end { border-color: rgba(239,68,68,0.5); background: rgba(239,68,68,0.08); }
 .ngv2-badge.instant { border-color: rgba(245,158,11,0.5); background: rgba(245,158,11,0.12); }
 
 .ngv2-nodeBody { padding: ${CFG.node.pad}px; display:flex; flex-direction: column; gap: 8px; }
@@ -1110,20 +1173,23 @@
 
       const header = document.createElement("div");
       header.className = "ngv2-nodeHeader";
+      if (node.type === "start") header.classList.add("type-start");
+      if (node.type === "end") header.classList.add("type-end");
 
       const title = document.createElement("div");
       title.className = "ngv2-nodeTitle";
       const b = document.createElement("b");
 
-      const rawText = String(frame?.text || "")
-        .trim()
-        .replace(/\s+/g, " ");
+      let titleText = "";
+      if (node.type === "start") titleText = "Start";
+      else if (node.type === "end") titleText = "End";
+      else {
+        const rawText = String(frame?.text || "").trim().replace(/\s+/g, " ");
+        const MAX = 25;
+        titleText = rawText.length > MAX ? rawText.slice(0, MAX) + "..." : rawText;
+      }
 
-      const MAX = 25;
-      const snippet =
-        rawText.length > MAX ? rawText.slice(0, MAX) + "..." : rawText;
-
-      b.textContent = snippet || "";
+      b.textContent = titleText || "";
 
       title.appendChild(b);
 
@@ -1139,6 +1205,16 @@
         const badge = document.createElement("span");
         badge.className = "ngv2-badge start";
         badge.textContent = "START";
+        right.appendChild(badge);
+      }
+
+      if (
+        STATE.endFrameId != null &&
+        Number(STATE.endFrameId) === Number(node.frameId)
+      ) {
+        const badge = document.createElement("span");
+        badge.className = "ngv2-badge end";
+        badge.textContent = "END";
         right.appendChild(badge);
       }
 
@@ -1271,6 +1347,29 @@
       }
 
       renderLinks();
+    }
+
+    function ensureStartEndNodes() {
+      const hasStart = STATE.nodes.some((n) => n.type === "start");
+      const hasEnd = STATE.nodes.some((n) => n.type === "end");
+
+      if (!hasStart) {
+        STATE.nodes.push({
+          id: nowId("node"),
+          type: "start",
+          x: 100,
+          y: 200,
+        });
+      }
+
+      if (!hasEnd) {
+        STATE.nodes.push({
+          id: nowId("node"),
+          type: "end",
+          x: 1000,
+          y: 200,
+        });
+      }
     }
 
     function fitToContent() {

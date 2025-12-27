@@ -235,6 +235,65 @@ function renderPreviewFrame() {
 }
 
 function openPreview() {
+  // Validate Start/End from node graph storage before opening
+  try {
+    const ch = getChapter();
+    const g = ch ? ch.graphV2 || ch["graphV2"] : null;
+    if (!g || !g.startFrameId || !g.endFrameId) {
+      if (typeof showToast === "function")
+        showToast("Please set Start and End in Storyline Node Editor", "error");
+      return;
+    }
+
+    // Build node id map to test reachability
+    const nodes = Array.isArray(g.nodes) ? g.nodes : [];
+    const links = Array.isArray(g.links) ? g.links : [];
+    const nodeById = new Map(nodes.map((n) => [String(n.id), n]));
+    let startNode = nodes.find((n) => Number(n.frameId) === Number(g.startFrameId));
+    let endNode = nodes.find((n) => Number(n.frameId) === Number(g.endFrameId));
+    if (!startNode || !endNode) {
+      if (typeof showToast === "function")
+        showToast("Start or End node not found in Storyline Node Editor", "error");
+      return;
+    }
+
+    const adj = new Map();
+    for (const l of links) {
+      if (!l || !l.from || !l.to) continue;
+      const a = String(l.from.nodeId);
+      const b = String(l.to.nodeId);
+      if (!adj.has(a)) adj.set(a, new Set());
+      adj.get(a).add(b);
+    }
+
+    // BFS
+    const q = [String(startNode.id)];
+    const seen = new Set(q);
+    let found = false;
+    while (q.length) {
+      const cur = q.shift();
+      if (cur === String(endNode.id)) {
+        found = true;
+        break;
+      }
+      const neigh = adj.get(cur) || new Set();
+      for (const nx of neigh) {
+        if (!seen.has(nx)) {
+          seen.add(nx);
+          q.push(nx);
+        }
+      }
+    }
+
+    if (!found) {
+      if (typeof showToast === "function")
+        showToast("Start and End are not connected in Storyline. Please connect them.", "error");
+      return;
+    }
+  } catch (e) {
+    console.warn("Preview validation failed:", e);
+  }
+
   previewCurrentIndex = activeFrameIndex;
   lastMainFrameIndex = -1;
   previousCharRects.clear();

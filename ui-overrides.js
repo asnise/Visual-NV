@@ -47,6 +47,58 @@
       justify-content: flex-end;
       gap: 10px;
     }
+    /* Loading Modal */
+    .loading-modal {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(0, 0, 0, 0.5);
+      z-index: 10000;
+      display: none;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      backdrop-filter: blur(2px);
+    }
+
+    .loading-modal.visible {
+      display: flex;
+    }
+
+    .spinner {
+      width: 40px;
+      height: 40px;
+      border: 4px solid #f3f3f3;
+      border-top: 4px solid var(--primary);
+      border-radius: 50%;
+      animation: spin 1s linear infinite;
+      margin-bottom: 10px;
+    }
+
+    #loadingText {
+      color: white;
+      font-weight: 500;
+      font-size: 16px;
+      text-shadow: 0 1px 2px rgba(0,0,0,0.5);
+    }
+
+    @keyframes spin {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+
+    /* Node Editor: Start & End Nodes */
+    .node-header.type-start {
+      background: var(--success);
+      color: white;
+    }
+
+    .node-header.type-end {
+      background: var(--danger);
+      color: white;
+    }
   `;
 
   const style = document.createElement("style");
@@ -71,6 +123,23 @@
       setTimeout(() => toast.remove(), 300);
     }, 3000);
   }
+
+  function showLoading(text = "Processing...") {
+    const el = document.getElementById("loadingModal");
+    if (!el) return;
+    const txt = document.getElementById("loadingText");
+    if (txt) txt.textContent = text;
+    el.classList.add("visible");
+  }
+
+  function hideLoading() {
+    const el = document.getElementById("loadingModal");
+    if (!el) return;
+    el.classList.remove("visible");
+  }
+
+  window.showLoading = showLoading;
+  window.hideLoading = hideLoading;
 
   const genericModalHtml = `
     <div id="uiGenericModal" class="modal-overlay" style="z-index:9999;">
@@ -319,7 +388,7 @@
   window.importJSON = async function (e) {
     const file = e.target.files[0];
     if (!file) return;
-
+    if (typeof showLoading === "function") showLoading("Loading project...");
     try {
       let imported;
       if (
@@ -361,16 +430,13 @@
       showToast("Error parsing project file", "error");
     }
     e.target.value = "";
+    if (typeof hideLoading === "function") hideLoading();
   };
 
-  
-  
   window.openNodeGraph = function () {
     window.openNodeGraphV2();
   };
 
-  
-  
   window.openNodeGraphV2 = function () {
     if (window.NodeGraphV2 && typeof window.NodeGraphV2.open === "function") {
       window.NodeGraphV2.open(
@@ -384,6 +450,7 @@
       const s = document.createElement("script");
       s.src = "node-graph-v2.js";
       s.onload = () => {
+        if (typeof hideLoading === "function") hideLoading();
         if (
           window.NodeGraphV2 &&
           typeof window.NodeGraphV2.open === "function"
@@ -395,16 +462,18 @@
           showToast("Node Graph V2 failed to load", "error");
         }
       };
-      s.onerror = () => showToast("Failed to load node-graph-v2.js", "error");
+      s.onerror = () => {
+        if (typeof hideLoading === "function") hideLoading();
+        showToast("Failed to load node-graph-v2.js", "error");
+      };
       document.head.appendChild(s);
-      showToast("Loading Node Graph V2…", "info");
+      if (typeof showLoading === "function") showLoading("Loading Node Graph V2...");
       return;
     }
 
     showToast("Node Graph V2 is not available", "error");
   };
 
-  
   window.addEventListener("keydown", (e) => {
     if (e.shiftKey && (e.key === "G" || e.key === "g")) {
       window.openNodeGraphV2();

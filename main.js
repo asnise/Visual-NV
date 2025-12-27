@@ -44,13 +44,11 @@ let project = {
   ],
 };
 
-
 const VN_LOCAL_PROJECT_KEY = "vnEditorProject_v1";
 const VN_LOCAL_PROJECT_VERSION = 1;
 
 let __saveTimer = null;
 function scheduleAutoSave(reason = "") {
-  
   if (__saveTimer) clearTimeout(__saveTimer);
   __saveTimer = setTimeout(() => {
     try {
@@ -71,12 +69,9 @@ function scheduleAutoSave(reason = "") {
         },
       };
       localStorage.setItem(VN_LOCAL_PROJECT_KEY, JSON.stringify(payload));
-    } catch (e) {
-      
-    }
+    } catch (e) {}
   }, 200);
 }
-
 
 try {
   window.scheduleAutoSave = scheduleAutoSave;
@@ -246,6 +241,31 @@ function addChapter() {
   renderChapterMgmt();
   loadChapter(id);
   scheduleAutoSave("add_chapter");
+}
+
+function newProject() {
+  const ok = confirm("Create a new project? Unsaved changes will be lost.");
+  if (!ok) return;
+
+  project = {
+    assets: { backgrounds: [] },
+    characters: [],
+    chapters: [
+      {
+        id: Date.now(),
+        title: "New Project",
+        frames: [
+          { id: Date.now() + 1, text: "Start", speakerId: "", background: "none", slots: [null, null, null, null] },
+        ],
+      },
+    ],
+  };
+
+  activeChapterId = project.chapters[0].id;
+  loadChapter(activeChapterId);
+  renderCastPalette();
+  scheduleAutoSave("new_project");
+  if (typeof showToast === "function") showToast("New project created", "success");
 }
 
 function deleteChapter(id) {
@@ -710,7 +730,6 @@ function renderInspector() {
   const execEl = container.querySelector("#details-exec");
   const execOpen = execEl ? execEl.hasAttribute("open") : true;
 
-  
   const choiceOpenMap = {};
   container
     .querySelectorAll("[data-choice-open]")
@@ -1153,13 +1172,28 @@ function dragStartMove(ev) {
 
 function allowDrop(ev) {
   ev.preventDefault();
-  const target = ev.target.closest(".slot-zone");
-  if (!target) return;
-  target.classList.add("drag-over");
+
+  document.querySelectorAll(".slot-zone").forEach((el) => {
+    if (el !== ev.currentTarget) {
+      el.classList.remove("drag-over");
+    }
+  });
+
+  ev.currentTarget.classList.add("drag-over");
+}
+
+function handleDragLeave(ev) {
+  if (ev.currentTarget.contains(ev.relatedTarget)) {
+    return;
+  }
+
+  ev.currentTarget.classList.remove("drag-over");
 }
 
 function drop(ev) {
   ev.preventDefault();
+  ev.currentTarget.classList.remove("drag-over");
+
   document
     .querySelectorAll(".slot-zone")
     .forEach((z) => z.classList.remove("drag-over"));
@@ -1275,25 +1309,30 @@ async function optimizeProjectImages() {
 }
 
 async function saveJSON() {
-  await optimizeProjectImages();
+  if (typeof showLoading === "function") showLoading("Saving project...");
+  try {
+    await optimizeProjectImages();
 
-  const jsonString = JSON.stringify(project);
+    const jsonString = JSON.stringify(project);
 
-  if (window.CompressionStream) {
-    const stream = new Blob([jsonString]).stream();
-    const compressedStream = stream.pipeThrough(new CompressionStream("gzip"));
-    const compressedBlob = await new Response(compressedStream).blob();
+    if (window.CompressionStream) {
+      const stream = new Blob([jsonString]).stream();
+      const compressedStream = stream.pipeThrough(new CompressionStream("gzip"));
+      const compressedBlob = await new Response(compressedStream).blob();
 
-    const a = document.createElement("a");
-    a.href = URL.createObjectURL(compressedBlob);
-    a.download = "vn-project-save.vns";
-    a.click();
-  } else {
-    const blob = new Blob([jsonString], { type: "application/json" });
-    const a = document.createElement("a");
-    a.href = URL.createObjectURL(blob);
-    a.download = "vn-project-save.json";
-    a.click();
+      const a = document.createElement("a");
+      a.href = URL.createObjectURL(compressedBlob);
+      a.download = "vn-project-save.vns";
+      a.click();
+    } else {
+      const blob = new Blob([jsonString], { type: "application/json" });
+      const a = document.createElement("a");
+      a.href = URL.createObjectURL(blob);
+      a.download = "vn-project-save.json";
+      a.click();
+    }
+  } finally {
+    if (typeof hideLoading === "function") hideLoading();
   }
 }
 
@@ -1324,6 +1363,7 @@ function exportJSON() {
 async function importJSON(e) {
   const file = e.target.files[0];
   if (!file) return;
+  if (typeof showLoading === "function") showLoading("Importing project...");
 
   try {
     let imported;
@@ -1364,9 +1404,10 @@ async function importJSON(e) {
     } else alert("Invalid format");
   } catch (err) {
     console.error(err);
-    alert("Parse error");
+      alert("Parse error");
   }
   e.target.value = "";
+    if (typeof hideLoading === "function") hideLoading();
 }
 
 function openModal(id) {
@@ -1378,7 +1419,6 @@ function openModal(id) {
 }
 
 function closeModal(id) {
-  
   if (id === "settingsModal" && typeof cancelSettings === "function") {
     cancelSettings();
     return;
@@ -1579,11 +1619,10 @@ function renderChapterMgmt() {
 }
 
 function init() {
-  
   tryRestoreFromLocalStorage();
 
   renderCastPalette();
-  
+
   loadChapter(activeChapterId || 1);
 
   if (!project.assets.backgrounds.length)
@@ -1619,7 +1658,6 @@ function init() {
   renderFilmstrip();
   renderStage();
 
-  
   scheduleAutoSave("init");
 
   if (typeof initSettingsModal === "function") {
@@ -1734,3 +1772,54 @@ function resetStageView() {
 }
 
 init();
+
+// เพิ่ม Helper Functions สำหรับ Loading
+function showLoading(text = "Processing...") {
+  const modal = document.getElementById("loadingModal");
+  if (modal) {
+    document.getElementById("loadingText").innerText = text;
+    modal.classList.add("visible");
+  }
+}
+
+function hideLoading() {
+  const modal = document.getElementById("loadingModal");
+  if (modal) modal.classList.remove("visible");
+}
+
+// ฟังก์ชัน New Project
+function newProject() {
+  if (confirm("Create a new project? Any unsaved changes will be lost.")) {
+    // รีเซ็ตค่า Project เป็นค่าเริ่มต้น
+    project = {
+      assets: { backgrounds: [] },
+      characters: [],
+      chapters: [
+        {
+          id: 1,
+          title: "Episode 1",
+          startFrameId: null, // เพิ่ม startFrameId
+          frames: [
+            {
+              id: 100,
+              text: "Start here...",
+              speakerId: "",
+              background: "none",
+              slots: [null, null, null, null],
+            },
+          ],
+        },
+      ],
+    };
+
+    // รีเซ็ต UI State
+    activeChapterId = 1;
+    activeFrameIndex = 0;
+    selectedSlotIndex = -1;
+
+    // โหลดหน้าจอใหม่
+    loadChapter(1);
+    showToast("New project created", "success");
+    scheduleAutoSave("new_project");
+  }
+}
