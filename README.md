@@ -1,4 +1,4 @@
-**Visual VN Editor — README (English / ไทย)**
+**Visual VN Editor - README (English / ไทย)**
 
 **Project Overview**:
 - **Name**: Visual VN Editor: a lightweight visual novel editor for creating chapters, frames, characters, backgrounds and story flow.
@@ -8,7 +8,7 @@
 - **index.html**: Main UI shell and layout.
 - **style.css**: Project styling and preview styles.
 - **settings.js**: App settings, theme and UI scale handling.
-- **ui-overrides.js**: UI helpers (toasts, modals, loading) — exposes `showToast`, `showLoading`, `hideLoading` globally.
+- **ui-overrides.js**: UI helpers (toasts, modals, loading) - exposes `showToast`, `showLoading`, `hideLoading` globally.
 - **main.js**: Core editor logic: project model, editor actions, renderers, import/export, stage and inspector.
 - **preview.js**: Runtime preview player and dialog typewriter logic.
 - **node-graph-v2.js**: Storyline node graph editor for start/end, links and auto-apply to frames.
@@ -28,7 +28,7 @@
 - The exported JSON contains top-level keys: `assets`, `characters`, `chapters`.
 - `chapters` → each chapter has `frames` (frame objects with `id`, `text`, `speakerId`, `background`, `slots`, `attributes`, `choices`).
 - Use the `node-graph-v2` data (stored as `graphV2` inside a chapter) to reconstruct storyline links and start/end markers.
-- To optimize images for production, run the `optimizeProjectImages()` logic (implemented in `main.js`) — it performs client-side compression on embedded images.
+- To optimize images for production, run the `optimizeProjectImages()` logic (implemented in `main.js`) - it performs client-side compression on embedded images.
 
 **Displaying / Previewing Results**:
 - The preview player is implemented in `preview.js`. It reads the active chapter frames and renders characters into four slots (`pSlot0`..`pSlot3`).
@@ -60,14 +60,14 @@
 **เอกสารโครงการ (ภาษาไทย)**
 
 **ภาพรวมโครงการ**:
-- **ชื่อ**: Visual VN Editor — ตัวแก้ไขนิยายภาพแบบเบา ใช้สร้างบท ตัวละคร ภูมิหลัง และลำดับเรื่อง
+- **ชื่อ**: Visual VN Editor - ตัวแก้ไขนิยายภาพแบบเบา ใช้สร้างบท ตัวละคร ภูมิหลัง และลำดับเรื่อง
 - **จุดประสงค์**: สร้าง ดูตัวอย่าง และส่งออกฉากในรูปแบบ JSON พร้อมเครื่องมือตกแต่ง storyline แบบกราฟ
 
 **โครงสร้างไฟล์**:
 - **index.html**: โครง UI หลัก
 - **style.css**: สไตล์ของโปรเจกต์
 - **settings.js**: จัดการการตั้งค่าแอป (ธีม, ขนาด UI)
-- **ui-overrides.js**: ฟังก์ชันช่วย UI (toast, modal, loading) — ให้ `showToast`/`showLoading`/`hideLoading` เป็น global
+- **ui-overrides.js**: ฟังก์ชันช่วย UI (toast, modal, loading) - ให้ `showToast`/`showLoading`/`hideLoading` เป็น global
 - **main.js**: โลจิกหลักของ editor (โมเดลโปรเจกต์, การเรนเดอร์, นำเข้า/ส่งออก)
 - **preview.js**: ตัวเล่นตัวอย่าง (typewriter, แสดงตัวละคร)
 - **node-graph-v2.js**: ตัวแก้ไขโหนดสำหรับ storyline
@@ -88,7 +88,7 @@
 - ใช้ข้อมูล `graphV2` ภายใน chapter เพื่อคืนสถานะลิงก์ของ storyline
 
 **การแสดงผล / ดูตัวอย่าง**:
-- ตัวเล่นตัวอย่างทำใน `preview.js` — อ่านเฟรมใน chapter ปัจจุบัน และแสดงตัวละครในสี่ช่อง (`pSlot0`..`pSlot3`)
+- ตัวเล่นตัวอย่างทำใน `preview.js` - อ่านเฟรมใน chapter ปัจจุบัน และแสดงตัวละครในสี่ช่อง (`pSlot0`..`pSlot3`)
 - รองรับ effect การพิมพ์ (`typeWriter`) และปุ่มตัวเลือก
 
 **การพัฒนาเพิ่มเติม**:
