@@ -363,33 +363,51 @@
     e.target.value = "";
   };
 
+  // Node Editor: V2 is the primary entry point.
+  // We keep `openNodeGraph()` for backward compatibility but route it to V2.
   window.openNodeGraph = function () {
-    if (window.NodeGraph && typeof window.NodeGraph.open === "function") {
-      window.NodeGraph.open(
+    window.openNodeGraphV2();
+  };
+
+  // Storyline Node Editor V2 (new UX/UI)
+  // Loads `node-graph-v2.js` on demand and opens it for the active chapter.
+  window.openNodeGraphV2 = function () {
+    if (window.NodeGraphV2 && typeof window.NodeGraphV2.open === "function") {
+      window.NodeGraphV2.open(
         typeof activeChapterId !== "undefined" ? activeChapterId : null,
       );
       return;
     }
 
-    const existing = document.querySelector('script[src="node-graph.js"]');
+    const existing = document.querySelector('script[src="node-graph-v2.js"]');
     if (!existing) {
       const s = document.createElement("script");
-      s.src = "node-graph.js";
+      s.src = "node-graph-v2.js";
       s.onload = () => {
-        if (window.NodeGraph && typeof window.NodeGraph.open === "function") {
-          window.NodeGraph.open(
+        if (
+          window.NodeGraphV2 &&
+          typeof window.NodeGraphV2.open === "function"
+        ) {
+          window.NodeGraphV2.open(
             typeof activeChapterId !== "undefined" ? activeChapterId : null,
           );
         } else {
-          showToast("Node Graph failed to load", "error");
+          showToast("Node Graph V2 failed to load", "error");
         }
       };
-      s.onerror = () => showToast("Failed to load node-graph.js", "error");
+      s.onerror = () => showToast("Failed to load node-graph-v2.js", "error");
       document.head.appendChild(s);
-      showToast("Loading Node Graph…", "info");
+      showToast("Loading Node Graph V2…", "info");
       return;
     }
 
-    showToast("Node Graph is not available", "error");
+    showToast("Node Graph V2 is not available", "error");
   };
+
+  // Optional: add a simple hotkey (Shift+G) to open V2 quickly
+  window.addEventListener("keydown", (e) => {
+    if (e.shiftKey && (e.key === "G" || e.key === "g")) {
+      window.openNodeGraphV2();
+    }
+  });
 })();

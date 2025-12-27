@@ -55,6 +55,23 @@
     --warning: #ffa726;
 }
 
+/* Disable browser text selection highlight across the tool UI (prevents blue selection while dragging) */
+html,
+body {
+    -webkit-user-select: none;
+    user-select: none;
+}
+
+/* Allow selection where it makes sense */
+input,
+textarea,
+select,
+option,
+[contenteditable="true"] {
+    -webkit-user-select: text;
+    user-select: text;
+}
+
 body {
     margin: 0;
     font-family:

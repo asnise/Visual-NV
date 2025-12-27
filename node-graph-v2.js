@@ -1,0 +1,1777 @@
+(function () {
+  "use strict";
+
+  /**
+   * Storyline Node Editor V2 (modular-ish, single-file)
+   * ---------------------------------------------------
+   * Goals (per request):
+   * - V2 is the primary node editor
+   * - Graph links are source of truth (stored in chapter.graphV2)
+   * - Multiple incoming per node (input "in" can accept multiple links)
+   * - No exec ports (choices of type exec are not shown as connectable outputs)
+   * - Vanilla HTML/JS, no external deps
+   *
+   * Integration expectation:
+   * - Project globals exist: `project`, `activeChapterId`
+   * - Frames structure: chapter.frames[] with frame.id, frame.text, frame.frameType, frame.choices[]
+   * - Optional global autosave hook: window.scheduleAutoSave(reason)
+   *
+   * Storage:
+   * - chapter.graphV2 = { v:1, nodes:[{id,frameId,x,y}], links:[{id,from:{nodeId,portId},to:{nodeId,portId}}], startFrameId, viewport:{x,y,scale} }
+   *
+   * Ports:
+   * - Input:  "in"
+   * - Outputs:
+   *   - "next" (always)
+   *   * - "choice:<choiceId>" (jump choices only; stable choiceId generated if missing)
+   *
+   * Notes:
+   * - Graph links are truth for the node editor, BUT we also provide "Apply to Frames"
+   *   to sync connections into the slide/frame data used by preview:
+   *   - frame.attributes.next (used by preview flow when clicking Next)
+   *   - frame.choices[].target (jump choices)
+   */
+
+  const NodeGraphV2 = (() => {
+    const STORAGE_KEY = "graphV2"; // property name on chapter
+    const VERSION = 1;
+
+    const CFG = {
+      grid: 24,
+      minScale: 0.35,
+      maxScale: 2.5,
+
+      node: {
+        w: 300,
+        headerH: 34,
+        pad: 10,
+        rowH: 28,
+        corner: 12,
+      },
+
+      port: {
+        r: 7,
+        hit: 18,
+      },
+
+      // Use app theme CSS variables (defined in style.css :root / [data-theme="dark"])
+      // so Storyline Node Editor matches the main tool theme automatically.
+      colors: {
+        // surfaces / text
+        bg: "var(--bg-app)",
+        panel: "var(--bg-panel)",
+        panel2: "var(--bg-secondary)",
+        border: "var(--border)",
+        text: "var(--text-main)",
+        muted: "var(--text-muted)",
+
+        // accents
+        accent: "var(--primary)",
+        ok: "var(--success)",
+        danger: "var(--danger)",
+        warn: "var(--warning)",
+
+        // Choice color isn't in the main theme vars; keep a stable purple accent.
+        choice: "#a855f7",
+
+        // links (SVG accepts CSS vars)
+        link: "var(--primary)",
+        linkSoft: "var(--slot-drag)",
+        linkNext: "var(--success)",
+        linkChoice: "#a855f7",
+      },
+    };
+
+    const STATE = {
+      open: false,
+      chapterId: null,
+
+      nodes: [],
+      links: [],
+      startFrameId: null,
+
+      // UX state
+      selectedNodeId: null,
+      selectingFrom: null, // { nodeId, portId }
+      hoverPort: null, // { nodeId, portId, side }
+      hoverNodeId: null,
+      hoverLinkId: null,
+
+      viewport: { x: 0, y: 0, scale: 1 },
+
+      drag: null, // { mode:"pan"|"node", nodeId?, start:{x,y}, origin:{x,y} }
+
+      // UI
+      ui: {
+        overlay: null,
+        modal: null,
+        headerTitle: null,
+        canvasWrap: null,
+        canvas: null,
+        svg: null,
+        toast: null,
+      },
+
+      _cssInjected: false,
+      _autosaveTimer: null,
+    };
+
+    // -------------------------
+    // Utilities
+    // -------------------------
+
+    function clamp(n, a, b) {
+      return Math.max(a, Math.min(b, n));
+    }
+
+    function snap(n, step) {
+      return Math.round(n / step) * step;
+    }
+
+    function safeId(x) {
+      return String(x ?? "");
+    }
+
+    function nowId(prefix = "id") {
+      return (
+        prefix +
+        "-" +
+        Math.floor(Math.random() * 1e9).toString(36) +
+        "-" +
+        Date.now().toString(36)
+      );
+    }
+
+    function getProject() {
+      if (typeof project === "undefined") return null;
+      return project;
+    }
+
+    function getChapter() {
+      const p = getProject();
+      if (!p) return null;
+
+      const id =
+        STATE.chapterId ??
+        (typeof activeChapterId !== "undefined" ? activeChapterId : null);
+
+      if (!id) return p.chapters?.[0] ?? null;
+      return p.chapters?.find((c) => c.id === id) ?? null;
+    }
+
+    function getFrames() {
+      const ch = getChapter();
+      return ch?.frames ?? [];
+    }
+
+    function getFrameById(frameId) {
+      const frames = getFrames();
+      const idNum = Number(frameId);
+      return frames.find((f) => Number(f?.id) === idNum) ?? null;
+    }
+
+    function frameType(frame) {
+      const t = (frame?.frameType || "main").toLowerCase();
+      return t;
+    }
+
+    function ensureChoiceIds() {
+      // Graph-links truth requires stable port identifiers across sessions.
+      // We only generate IDs if missing. This mutates project data but is safe and minimal.
+      const frames = getFrames();
+      let mutated = false;
+
+      for (const f of frames) {
+        const choices = Array.isArray(f?.choices) ? f.choices : null;
+        if (!choices) continue;
+
+        for (const c of choices) {
+          if (!c || typeof c !== "object") continue;
+          // Only relevant for jump choices (connectable)
+          const type = (c.type || "jump").toLowerCase();
+          if (type !== "jump") continue;
+
+          if (!c.id) {
+            c.id = nowId("choice");
+            mutated = true;
+          } else {
+            // normalize to string
+            c.id = String(c.id);
+          }
+        }
+      }
+
+      // If we mutated IDs, also re-apply the graph mapping so targets stay aligned.
+      if (mutated) {
+        scheduleAutosave("ensure_choice_ids");
+        try {
+          applyGraphLinksToFrames();
+        } catch (e) {}
+      }
+    }
+
+    function ensureFrameAttributes(frame) {
+      if (!frame || typeof frame !== "object") return;
+      if (!frame.attributes || typeof frame.attributes !== "object") {
+        frame.attributes = {};
+      }
+    }
+
+    function applyGraphLinksToFrames() {
+      // Sync graphV2 links into frame/slide data so preview & inspector stay consistent.
+      // Policy:
+      // - For each frame:
+      //   - Clear frame.attributes.next
+      //   - Clear targets for jump choices (set to "" when not connected)
+      // - For each graph link:
+      //   - from "next" => set fromFrame.attributes.next = toFrame.id
+      //   - from "choice:<choiceId>" => set the matching choice.target = toFrame.id
+      //
+      // Notes:
+      // - We only touch jump choices (type === "jump")
+      // - We do not create new choices; we only map existing ones by stable choice.id
+      // - Exec choices are ignored (no ports)
+      const frames = getFrames();
+      if (!frames || !frames.length) return { ok: false, reason: "No frames." };
+
+      // Build nodeId -> frameId
+      const nodeToFrameId = new Map();
+      for (const n of STATE.nodes || []) {
+        if (!n || n.type !== "frame") continue;
+        if (!Number.isFinite(Number(n.frameId))) continue;
+        nodeToFrameId.set(safeId(n.id), Number(n.frameId));
+      }
+
+      const frameById = new Map();
+      for (const f of frames) {
+        if (!f) continue;
+        const fid = Number(f.id);
+        if (!Number.isFinite(fid)) continue;
+        frameById.set(fid, f);
+      }
+
+      // Reset
+      for (const f of frames) {
+        if (!f) continue;
+        ensureFrameAttributes(f);
+        // next: store as numeric id or empty string (use empty string to match existing style)
+        f.attributes.next = "";
+
+        const choices = Array.isArray(f.choices) ? f.choices : [];
+        for (const c of choices) {
+          if (!c || typeof c !== "object") continue;
+          const type = (c.type || "jump").toLowerCase();
+          if (type !== "jump") continue;
+          // Ensure string target (existing editor uses string often)
+          c.target = "";
+        }
+      }
+
+      // Apply links
+      for (const l of STATE.links || []) {
+        const fromNodeId = safeId(l?.from?.nodeId);
+        const toNodeId = safeId(l?.to?.nodeId);
+        const fromPortId = safeId(l?.from?.portId);
+
+        const fromFrameId = nodeToFrameId.get(fromNodeId);
+        const toFrameId = nodeToFrameId.get(toNodeId);
+        if (
+          !Number.isFinite(Number(fromFrameId)) ||
+          !Number.isFinite(Number(toFrameId))
+        )
+          continue;
+
+        const fromFrame = frameById.get(Number(fromFrameId));
+        const toFrame = frameById.get(Number(toFrameId));
+        if (!fromFrame || !toFrame) continue;
+
+        ensureFrameAttributes(fromFrame);
+
+        if (fromPortId === "next") {
+          fromFrame.attributes.next = String(toFrame.id);
+          continue;
+        }
+
+        if (fromPortId.startsWith("choice:")) {
+          const choiceId = fromPortId.slice("choice:".length);
+          if (!choiceId) continue;
+
+          const choices = Array.isArray(fromFrame.choices)
+            ? fromFrame.choices
+            : [];
+          let matched = false;
+
+          for (const c of choices) {
+            if (!c || typeof c !== "object") continue;
+            const type = (c.type || "jump").toLowerCase();
+            if (type !== "jump") continue;
+            if (safeId(c.id) === safeId(choiceId)) {
+              c.target = String(toFrame.id);
+              matched = true;
+              break;
+            }
+          }
+
+          // If choice ID not found (stale port), ignore.
+          if (!matched) continue;
+        }
+      }
+
+      scheduleAutosave("node_graph_v2:apply_to_frames");
+      return { ok: true, reason: "" };
+    }
+
+    function ensureStorage(ch) {
+      if (!ch) return null;
+      if (!ch[STORAGE_KEY] || typeof ch[STORAGE_KEY] !== "object") {
+        ch[STORAGE_KEY] = {
+          v: VERSION,
+          nodes: [],
+          links: [],
+          startFrameId: null,
+          viewport: { x: 0, y: 0, scale: 1 },
+        };
+      }
+      if (ch[STORAGE_KEY].v !== VERSION) {
+        // naive reset for version mismatch (can implement migrations later)
+        ch[STORAGE_KEY] = {
+          v: VERSION,
+          nodes: [],
+          links: [],
+          startFrameId: null,
+          viewport: { x: 0, y: 0, scale: 1 },
+        };
+      }
+      return ch[STORAGE_KEY];
+    }
+
+    function scheduleAutosave(reason = "node_graph_v2") {
+      if (STATE._autosaveTimer) clearTimeout(STATE._autosaveTimer);
+      STATE._autosaveTimer = setTimeout(() => {
+        try {
+          if (typeof window.scheduleAutoSave === "function") {
+            window.scheduleAutoSave(reason);
+          }
+        } catch (e) {}
+        STATE._autosaveTimer = null;
+      }, 200);
+    }
+
+    function worldToScreen(p) {
+      return {
+        x: p.x * STATE.viewport.scale + STATE.viewport.x,
+        y: p.y * STATE.viewport.scale + STATE.viewport.y,
+      };
+    }
+
+    function screenToWorld(p) {
+      return {
+        x: (p.x - STATE.viewport.x) / STATE.viewport.scale,
+        y: (p.y - STATE.viewport.y) / STATE.viewport.scale,
+      };
+    }
+
+    // -------------------------
+    // Model: nodes/ports/links
+    // -------------------------
+
+    function ensureNodesForFrames() {
+      const frames = getFrames();
+      const existingByFrame = new Map();
+      for (const n of STATE.nodes) {
+        if (n && n.type === "frame" && Number.isFinite(Number(n.frameId))) {
+          existingByFrame.set(Number(n.frameId), n);
+        }
+      }
+
+      let i = 0;
+      for (const f of frames) {
+        const fid = Number(f?.id);
+        if (!Number.isFinite(fid)) continue;
+
+        if (!existingByFrame.has(fid)) {
+          const col = i % 4;
+          const row = Math.floor(i / 4);
+          STATE.nodes.push({
+            id: nowId("node"),
+            type: "frame",
+            frameId: fid,
+            x: 200 + col * (CFG.node.w + 120),
+            y: 140 + row * 140,
+          });
+        }
+        i++;
+      }
+    }
+
+    function normalizeAgainstFrames() {
+      const frames = getFrames();
+      const frameIds = new Set(frames.map((f) => Number(f?.id)));
+
+      // drop nodes whose frames no longer exist
+      STATE.nodes = (STATE.nodes || []).filter((n) => {
+        if (!n || n.type !== "frame") return false;
+        return frameIds.has(Number(n.frameId));
+      });
+
+      // drop links pointing to missing nodes
+      const nodeIdSet = new Set(STATE.nodes.map((n) => safeId(n.id)));
+      STATE.links = (STATE.links || []).filter((l) => {
+        if (!l || !l.from || !l.to) return false;
+        if (!nodeIdSet.has(safeId(l.from.nodeId))) return false;
+        if (!nodeIdSet.has(safeId(l.to.nodeId))) return false;
+        // still enforce the input port name, but allow multiple incoming links
+        if (safeId(l.to.portId) !== "in") return false;
+        return true;
+      });
+
+      // start frame
+      if (
+        STATE.startFrameId != null &&
+        !frameIds.has(Number(STATE.startFrameId))
+      )
+        STATE.startFrameId = null;
+    }
+
+    function getNode(nodeId) {
+      const id = safeId(nodeId);
+      return STATE.nodes.find((n) => safeId(n.id) === id) ?? null;
+    }
+
+    function getNodeByFrameId(frameId) {
+      const fid = Number(frameId);
+      return STATE.nodes.find((n) => Number(n.frameId) === fid) ?? null;
+    }
+
+    function getPortsForNode(node) {
+      if (!node || node.type !== "frame") return { inputs: [], outputs: [] };
+      const frame = getFrameById(node.frameId);
+
+      const inputs = [{ id: "in", label: "In", kind: "in" }];
+
+      const outputs = [];
+      outputs.push({ id: "next", label: "Next", kind: "next" });
+
+      // Jump choices only; no exec ports per requirement.
+      const choices = Array.isArray(frame?.choices) ? frame.choices : [];
+      for (const c of choices) {
+        if (!c || typeof c !== "object") continue;
+        const type = (c.type || "jump").toLowerCase();
+        if (type !== "jump") continue;
+
+        const cid = safeId(c.id);
+        const text = String(c.text || "Choice").trim();
+        outputs.push({
+          id: `choice:${cid}`,
+          label: `Choice: ${text || "(empty)"}`,
+          kind: "choice",
+        });
+      }
+
+      return { inputs, outputs };
+    }
+
+    function validateConnection(from, to) {
+      // single incoming: to must always be input "in"
+      if (!from || !to) return { ok: false, reason: "Invalid endpoint." };
+
+      if (safeId(from.nodeId) === safeId(to.nodeId))
+        return { ok: false, reason: "Cannot connect a node to itself." };
+
+      if (safeId(from.portId) === "")
+        return { ok: false, reason: "Invalid from port." };
+      if (safeId(to.portId) !== "in")
+        return { ok: false, reason: "Invalid to port." };
+
+      // from must be output: next or choice
+      const fp = safeId(from.portId);
+      if (fp !== "next" && !fp.startsWith("choice:"))
+        return {
+          ok: false,
+          reason: "Only Next/Choice outputs are connectable.",
+        };
+
+      // ensure from port exists on that node (prevents stale links)
+      const fromNode = getNode(from.nodeId);
+      if (!fromNode) return { ok: false, reason: "From node missing." };
+      const ports = getPortsForNode(fromNode).outputs;
+      if (!ports.some((p) => safeId(p.id) === fp))
+        return { ok: false, reason: "From port no longer exists." };
+
+      return { ok: true, reason: "" };
+    }
+
+    function removeLinksWhere(pred) {
+      const before = STATE.links.length;
+      STATE.links = STATE.links.filter((l) => !pred(l));
+      return before !== STATE.links.length;
+    }
+
+    function findExistingFromLink(fromNodeId, fromPortId) {
+      const a = safeId(fromNodeId);
+      const b = safeId(fromPortId);
+      return STATE.links.find(
+        (l) => safeId(l?.from?.nodeId) === a && safeId(l?.from?.portId) === b,
+      );
+    }
+
+    function findIncomingToNode(toNodeId) {
+      const b = safeId(toNodeId);
+      return STATE.links.find(
+        (l) => safeId(l?.to?.nodeId) === b && safeId(l?.to?.portId) === "in",
+      );
+    }
+
+    function upsertLink(from, to) {
+      // Rules:
+      // - One outgoing per (nodeId,portId): replace existing.
+      // - Multiple incoming allowed: do NOT remove other links into the same node.
+      const ok = validateConnection(from, to);
+      if (!ok.ok) return ok;
+
+      // replace outgoing on same port
+      removeLinksWhere(
+        (l) =>
+          safeId(l?.from?.nodeId) === safeId(from.nodeId) &&
+          safeId(l?.from?.portId) === safeId(from.portId),
+      );
+
+      // NOTE: We intentionally do NOT remove existing incoming links.
+      // This allows multiple nodes to connect into the same target node.
+      STATE.links.push({
+        id: nowId("link"),
+        from: { nodeId: safeId(from.nodeId), portId: safeId(from.portId) },
+        to: { nodeId: safeId(to.nodeId), portId: "in" },
+      });
+
+      return { ok: true, reason: "" };
+    }
+
+    function deleteLink(linkId) {
+      const id = safeId(linkId);
+      return removeLinksWhere((l) => safeId(l?.id) === id);
+    }
+
+    // -------------------------
+    // Persistence
+    // -------------------------
+
+    function saveToChapter(reason = "save") {
+      const ch = getChapter();
+      if (!ch) return;
+
+      const g = ensureStorage(ch);
+
+      g.nodes = (STATE.nodes || []).map((n) => ({
+        id: safeId(n.id),
+        type: "frame",
+        frameId: Number(n.frameId),
+        x: Number(n.x) || 0,
+        y: Number(n.y) || 0,
+      }));
+
+      g.links = (STATE.links || []).map((l) => ({
+        id: safeId(l.id) || nowId("link"),
+        from: { nodeId: safeId(l.from.nodeId), portId: safeId(l.from.portId) },
+        to: { nodeId: safeId(l.to.nodeId), portId: "in" },
+      }));
+
+      g.startFrameId =
+        STATE.startFrameId != null ? Number(STATE.startFrameId) : null;
+      g.viewport = {
+        x: Number(STATE.viewport.x) || 0,
+        y: Number(STATE.viewport.y) || 0,
+        scale: Number(STATE.viewport.scale) || 1,
+      };
+
+      // Keep preview/player in sync: whenever graph links change, apply into frame data.
+      // This makes node/frame/slide "work together" without requiring manual actions.
+      try {
+        applyGraphLinksToFrames();
+      } catch (e) {}
+
+      scheduleAutosave("node_graph_v2:" + reason);
+    }
+
+    function loadFromChapter(chapterId) {
+      STATE.chapterId = chapterId ?? null;
+
+      ensureChoiceIds();
+
+      const ch = getChapter();
+      if (!ch) return;
+
+      const g = ensureStorage(ch);
+
+      STATE.nodes = (g.nodes || []).map((n) => ({
+        id: safeId(n.id) || nowId("node"),
+        type: "frame",
+        frameId: Number(n.frameId),
+        x: Number(n.x) || 200,
+        y: Number(n.y) || 140,
+      }));
+
+      STATE.links = (g.links || []).map((l) => ({
+        id: safeId(l.id) || nowId("link"),
+        from: {
+          nodeId: safeId(l?.from?.nodeId),
+          portId: safeId(l?.from?.portId),
+        },
+        to: { nodeId: safeId(l?.to?.nodeId), portId: "in" },
+      }));
+
+      STATE.startFrameId =
+        g.startFrameId != null ? Number(g.startFrameId) : null;
+
+      if (g.viewport && typeof g.viewport === "object") {
+        STATE.viewport.x = Number(g.viewport.x) || 0;
+        STATE.viewport.y = Number(g.viewport.y) || 0;
+        STATE.viewport.scale = clamp(
+          Number(g.viewport.scale) || 1,
+          CFG.minScale,
+          CFG.maxScale,
+        );
+      }
+
+      ensureNodesForFrames();
+      normalizeAgainstFrames();
+
+      // Do not autosave on load.
+    }
+
+    // -------------------------
+    // UI
+    // -------------------------
+
+    function injectCss() {
+      if (STATE._cssInjected) return;
+
+      const style = document.createElement("style");
+      style.textContent = `
+.ngv2-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0,0,0,0.45);
+  backdrop-filter: blur(1px);
+}
+
+.ngv2-modal {
+  width: min(92vw, 1200px);
+  height: min(88vh, 900px);
+  background: ${CFG.colors.bg};
+  border: none;
+  border-radius: 8px;
+  box-shadow: var(--shadow-lg);
+  display: grid;
+  grid-template-rows: 52px 1fr;
+  overflow: hidden;
+  color: ${CFG.colors.text};
+  font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+}
+
+.ngv2-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 12px;
+  background: ${CFG.colors.panel2};
+  border-bottom: 1px solid ${CFG.colors.border};
+}
+
+.ngv2-title {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.ngv2-title b { font-size: 14px; font-weight: 700; letter-spacing: 0.2px; }
+.ngv2-title span { font-size: 12px; color: ${CFG.colors.muted}; }
+
+.ngv2-actions {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.ngv2-btn {
+  appearance: none;
+  border: 1px solid ${CFG.colors.border};
+  background: ${CFG.colors.panel};
+  color: ${CFG.colors.text};
+  padding: 7px 10px;
+  border-radius: var(--radius-xl);
+  cursor: pointer;
+  font-size: 12px;
+  user-select: none;
+  box-shadow: var(--shadow-sm);
+}
+.ngv2-btn:hover { background: var(--hover-bg); }
+.ngv2-btn.primary { border-color: var(--primary); background: var(--selected-bg); }
+.ngv2-btn.danger { border-color: var(--danger); background: rgba(239, 68, 68, 0.12); }
+
+.ngv2-body {
+  display: grid;
+  grid-template-columns: 1fr;
+  min-height: 0;
+}
+
+.ngv2-canvasWrap {
+
+  position: relative;
+  overflow: hidden;
+  background:
+    radial-gradient(circle at 1px 1px, rgba(0,0,0,0.06) 1px, transparent 0) 0 0 / ${CFG.grid}px ${CFG.grid}px,
+    ${CFG.colors.bg};
+  cursor: grab;
+}
+
+.ngv2-canvas {
+  position: absolute;
+  inset: 0;
+  background: #222126;
+}
+
+.ngv2-svg {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 10;
+}
+
+.ngv2-inspector {
+  display: none;
+}
+
+.ngv2-card {
+  border: 1px solid ${CFG.colors.border};
+  background: ${CFG.colors.panel};
+  border-radius: var(--radius-xl);
+  padding: 10px;
+  margin-bottom: 10px;
+  box-shadow: var(--shadow-sm);
+}
+
+.ngv2-kv { display:flex; flex-direction:column; gap:6px; font-size:12px; }
+.ngv2-kv label { color: ${CFG.colors.muted}; font-size: 11px; }
+.ngv2-kv input {
+  width: 100%;
+  border: 1px solid ${CFG.colors.border};
+  background: rgba(255,255,255,0.05);
+  color: ${CFG.colors.text};
+  padding: 7px 8px;
+  border-radius: 10px;
+  outline: none;
+}
+.ngv2-kv input:focus { border-color: rgba(59,130,246,0.55); box-shadow: 0 0 0 3px rgba(59,130,246,0.18); }
+
+.ngv2-toast {
+  position: absolute;
+  bottom: 12px;
+  left: 12px;
+  max-width: 520px;
+  background: rgba(0,0,0,0.55);
+  border: 1px solid ${CFG.colors.border};
+  padding: 8px 10px;
+  border-radius: 10px;
+  font-size: 12px;
+  color: ${CFG.colors.text};
+  opacity: 0;
+  transform: translateY(6px);
+  transition: opacity 120ms ease, transform 120ms ease;
+  pointer-events: none;
+}
+.ngv2-toast.show { opacity: 1; transform: translateY(0); }
+
+.ngv2-node {
+  position: absolute;
+  width: ${CFG.node.w}px;
+  border-radius: var(--radius-xl);
+  border: 1px solid ${CFG.colors.border};
+  background: ${CFG.colors.panel};
+  box-shadow: var(--shadow-lg);
+  transform-origin: top left;
+  user-select: none;
+}
+
+.ngv2-node.selected {
+  border-color: rgba(59,130,246,0.65);
+  box-shadow: 0 10px 36px rgba(59,130,246,0.12), 0 10px 36px rgba(0,0,0,0.35);
+}
+
+.ngv2-nodeHeader {
+  height: ${CFG.node.headerH}px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 ${CFG.node.pad}px;
+  border-bottom: 1px solid ${CFG.colors.border};
+  background: ${CFG.colors.panel2};
+  border-top-left-radius: var(--radius-xl);
+  border-top-right-radius: var(--radius-xl);
+}
+
+.ngv2-nodeTitle {
+  display:flex;
+  flex-direction: column;
+  gap: 1px;
+  overflow: hidden;
+}
+.ngv2-nodeTitle b {
+  font-size: 12px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.ngv2-nodeTitle span {
+  font-size: 11px;
+  color: ${CFG.colors.muted};
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.ngv2-badge {
+  font-size: 10px;
+  padding: 2px 6px;
+  border-radius: 999px;
+  border: 1px solid ${CFG.colors.border};
+  background: rgba(255,255,255,0.06);
+  color: ${CFG.colors.text};
+}
+.ngv2-badge.start { border-color: rgba(34,197,94,0.5); background: rgba(34,197,94,0.12); }
+.ngv2-badge.instant { border-color: rgba(245,158,11,0.5); background: rgba(245,158,11,0.12); }
+
+.ngv2-nodeBody { padding: ${CFG.node.pad}px; display:flex; flex-direction: column; gap: 8px; }
+
+/* Port grouping: inputs on the left, outputs on the right */
+.ngv2-portsGrid{
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  align-items: start;
+}
+.ngv2-portCol{
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+}
+.ngv2-portColTitle{
+  font-size: 10px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: ${CFG.colors.muted};
+  padding: 0 6px;
+  margin-bottom: 2px;
+  user-select: none;
+}
+.ngv2-portColTitle.in{ text-align: left; }
+.ngv2-portColTitle.out{ text-align: right; }
+.ngv2-portCol.out{ align-items: flex-end; }
+.ngv2-portCol.out .ngv2-port{ justify-content: flex-end; text-align: right; }
+/* Keep DOT on the far right for OUT ports (label aligns right next to it) */
+.ngv2-portCol.out .ngv2-dot { order: 2; }
+.ngv2-portCol.out .ngv2-portLabel { order: 1; }
+
+/* Legacy row class remains for other uses */
+.ngv2-row { display:flex; align-items:center; justify-content: space-between; gap: 8px; height: ${CFG.node.rowH}px; }
+
+.ngv2-port {
+  display:flex;
+  align-items:center;
+  gap: 8px;
+  cursor: pointer;
+  padding: 5px 8px;
+  border-radius: var(--radius-xl);
+  border: 1px solid transparent;
+  background: var(--hover-bg);
+}
+.ngv2-port:hover {
+  border-color: ${CFG.colors.border};
+  background: var(--selected-bg);
+}
+
+.ngv2-portLabel { font-size: 12px; color: ${CFG.colors.text}; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ngv2-dot {
+  width: 12px;
+  height: 12px;
+  border-radius: 999px;
+  border: 2px solid rgba(255,255,255,0.18);
+  background: rgba(255,255,255,0.08);
+  box-shadow: 0 0 0 2px rgba(0,0,0,0.25);
+  flex: 0 0 auto;
+}
+
+.ngv2-dot.in { background: rgba(255,255,255,0.10); border-color: rgba(255,255,255,0.18); }
+.ngv2-dot.next { background: rgba(34,197,94,0.75); border-color: rgba(34,197,94,0.95); }
+.ngv2-dot.choice { background: rgba(168,85,247,0.75); border-color: rgba(168,85,247,0.95); }
+
+.ngv2-port.selected {
+  border-color: rgba(59,130,246,0.55);
+  box-shadow: 0 0 0 3px rgba(59,130,246,0.18);
+}
+
+.ngv2-port.connectable {
+  border-color: rgba(34,197,94,0.55);
+  box-shadow: 0 0 0 3px rgba(34,197,94,0.15);
+}
+.ngv2-port.disabled { opacity: 0.55; filter: grayscale(0.35); cursor: not-allowed; }
+`;
+      document.head.appendChild(style);
+      STATE._cssInjected = true;
+    }
+
+    function ensureUI() {
+      injectCss();
+
+      if (STATE.ui.overlay) return;
+
+      const overlay = document.createElement("div");
+      overlay.className = "ngv2-overlay";
+      overlay.addEventListener("mousedown", (e) => {
+        // click outside modal closes
+        if (e.target === overlay) close();
+      });
+
+      const modal = document.createElement("div");
+      modal.className = "ngv2-modal";
+
+      const header = document.createElement("div");
+      header.className = "ngv2-header";
+
+      const title = document.createElement("div");
+      title.className = "ngv2-title";
+      const titleB = document.createElement("b");
+      titleB.textContent = "Storyline Node Editor (V2)";
+      const titleS = document.createElement("span");
+      title.appendChild(titleB);
+      title.appendChild(titleS);
+
+      const actions = document.createElement("div");
+      actions.className = "ngv2-actions";
+
+      // Single-button UX: everything auto-saves; just Close when done.
+      const btnClose = document.createElement("button");
+      btnClose.textContent = "×";
+      btnClose.onclick = () => close();
+
+      actions.appendChild(btnClose);
+
+      header.appendChild(title);
+      header.appendChild(actions);
+
+      const body = document.createElement("div");
+      body.className = "ngv2-body";
+
+      const canvasWrap = document.createElement("div");
+      canvasWrap.className = "ngv2-canvasWrap";
+      canvasWrap.tabIndex = 0;
+
+      const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+      svg.classList.add("ngv2-svg");
+      svg.setAttribute("width", "100%");
+      svg.setAttribute("height", "100%");
+
+      const canvas = document.createElement("div");
+      canvas.className = "ngv2-canvas";
+
+      const toastEl = document.createElement("div");
+      toastEl.className = "ngv2-toast";
+
+      canvasWrap.appendChild(svg);
+      canvasWrap.appendChild(canvas);
+      canvasWrap.appendChild(toastEl);
+
+      body.appendChild(canvasWrap);
+
+      modal.appendChild(header);
+      modal.appendChild(body);
+      overlay.appendChild(modal);
+      document.body.appendChild(overlay);
+
+      STATE.ui.overlay = overlay;
+      STATE.ui.modal = modal;
+      STATE.ui.headerTitle = titleB;
+      STATE.ui.canvasWrap = canvasWrap;
+      STATE.ui.canvas = canvas;
+      STATE.ui.svg = svg;
+      STATE.ui.toast = toastEl;
+
+      wireEvents();
+    }
+
+    function toast(msg) {
+      const el = STATE.ui.toast;
+      if (!el) return;
+      el.textContent = String(msg ?? "");
+      el.classList.add("show");
+      setTimeout(() => el.classList.remove("show"), 1300);
+    }
+
+    // -------------------------
+    // Rendering
+    // -------------------------
+
+    function nodeScreenRect(node) {
+      const p = worldToScreen({ x: node.x, y: node.y });
+      return {
+        x: p.x,
+        y: p.y,
+        w: CFG.node.w * STATE.viewport.scale,
+        h: 60 * STATE.viewport.scale,
+      };
+    }
+
+    function portWorldPos(node, side, index, count) {
+      // ports displayed as rows in node body; align dots by row
+      //
+      // V2 note:
+      // We added IN/OUT column titles inside the node body. Those titles take up
+      // vertical space and visually shift the port rows down by ~1 "block".
+      // Offset the link anchors down by 1 row so link lines line up with the ports.
+      const titleOffset = CFG.node.rowH; // "1 block"
+      const baseY =
+        node.y +
+        CFG.node.headerH +
+        CFG.node.pad +
+        titleOffset +
+        CFG.node.rowH / 2;
+      const y = baseY + index * CFG.node.rowH;
+      const x = side === "in" ? node.x - 16 : node.x + CFG.node.w + 16;
+
+      return { x, y };
+    }
+
+    function getLinkColor(portId) {
+      const pid = safeId(portId);
+      if (pid === "next") return CFG.colors.linkNext;
+      if (pid.startsWith("choice:")) return CFG.colors.linkChoice;
+      return CFG.colors.link;
+    }
+
+    function renderLinks() {
+      const svg = STATE.ui.svg;
+      if (!svg) return;
+
+      // clear
+      while (svg.firstChild) svg.removeChild(svg.firstChild);
+
+      const ns = "http://www.w3.org/2000/svg";
+
+      const nodeById = new Map();
+      for (const n of STATE.nodes) nodeById.set(safeId(n.id), n);
+
+      for (const l of STATE.links) {
+        const fromN = nodeById.get(safeId(l?.from?.nodeId));
+        const toN = nodeById.get(safeId(l?.to?.nodeId));
+        if (!fromN || !toN) continue;
+
+        const fromPorts = getPortsForNode(fromN).outputs;
+        const fromIdx = Math.max(
+          0,
+          fromPorts.findIndex((p) => safeId(p.id) === safeId(l.from.portId)),
+        );
+
+        const outCount = Math.max(1, fromPorts.length);
+        const p1w = portWorldPos(fromN, "out", fromIdx, outCount);
+        const p2w = portWorldPos(toN, "in", 0, 1);
+
+        const p1 = worldToScreen(p1w);
+        const p2 = worldToScreen(p2w);
+
+        const dx = Math.max(60, Math.abs(p2.x - p1.x) * 0.45);
+        const c1 = { x: p1.x + dx, y: p1.y };
+        const c2 = { x: p2.x - dx, y: p2.y };
+
+        const path = document.createElementNS(ns, "path");
+        const d = `M ${p1.x} ${p1.y} C ${c1.x} ${c1.y}, ${c2.x} ${c2.y}, ${p2.x} ${p2.y}`;
+        path.setAttribute("d", d);
+        path.setAttribute("fill", "none");
+        path.setAttribute("stroke", getLinkColor(l.from.portId));
+        path.setAttribute("stroke-width", String(3 * STATE.viewport.scale));
+        path.setAttribute("opacity", "0.95");
+
+        svg.appendChild(path);
+
+        // (optional) simple arrow head
+        const arrow = document.createElementNS(ns, "circle");
+        arrow.setAttribute("cx", String(p2.x));
+        arrow.setAttribute("cy", String(p2.y));
+        arrow.setAttribute("r", String(4.5 * STATE.viewport.scale));
+        arrow.setAttribute("fill", getLinkColor(l.from.portId));
+        arrow.setAttribute("opacity", "0.95");
+        svg.appendChild(arrow);
+      }
+
+      // ghost link (armed)
+      if (STATE.selectingFrom && STATE._mouseWorld) {
+        const fromN = nodeById.get(safeId(STATE.selectingFrom.nodeId));
+        if (fromN) {
+          const fromPorts = getPortsForNode(fromN).outputs;
+          const fromIdx = Math.max(
+            0,
+            fromPorts.findIndex(
+              (p) => safeId(p.id) === safeId(STATE.selectingFrom.portId),
+            ),
+          );
+
+          const p1w = portWorldPos(
+            fromN,
+            "out",
+            fromIdx,
+            Math.max(1, fromPorts.length),
+          );
+          const p2w = STATE._mouseWorld;
+          const p1 = worldToScreen(p1w);
+          const p2 = worldToScreen(p2w);
+
+          const dx = Math.max(60, Math.abs(p2.x - p1.x) * 0.45);
+          const c1 = { x: p1.x + dx, y: p1.y };
+          const c2 = { x: p2.x - dx, y: p2.y };
+
+          const ns = "http://www.w3.org/2000/svg";
+          const path = document.createElementNS(ns, "path");
+          const d = `M ${p1.x} ${p1.y} C ${c1.x} ${c1.y}, ${c2.x} ${c2.y}, ${p2.x} ${p2.y}`;
+          path.setAttribute("d", d);
+          path.setAttribute("fill", "none");
+          path.setAttribute("stroke", getLinkColor(STATE.selectingFrom.portId));
+          path.setAttribute("stroke-width", String(2.5 * STATE.viewport.scale));
+          path.setAttribute("opacity", "0.35");
+          path.setAttribute(
+            "stroke-dasharray",
+            `${8 * STATE.viewport.scale} ${6 * STATE.viewport.scale}`,
+          );
+          svg.appendChild(path);
+        }
+      }
+    }
+
+    function renderNode(node) {
+      const frame = getFrameById(node.frameId);
+
+      const el = document.createElement("div");
+      el.className = "ngv2-node";
+      el.setAttribute("data-node", safeId(node.id));
+
+      const sc = STATE.viewport.scale;
+      const p = worldToScreen({ x: node.x, y: node.y });
+      el.style.left = `${p.x}px`;
+      el.style.top = `${p.y}px`;
+      el.style.transform = `scale(${sc})`;
+
+      if (safeId(STATE.selectedNodeId) === safeId(node.id))
+        el.classList.add("selected");
+
+      // header
+      const header = document.createElement("div");
+      header.className = "ngv2-nodeHeader";
+
+      const title = document.createElement("div");
+      title.className = "ngv2-nodeTitle";
+      const b = document.createElement("b");
+      const label = `#${frame?.id ?? node.frameId}`;
+      b.textContent = label || `Frame ${node.frameId}`;
+      const s = document.createElement("span");
+      s.textContent = `Type: ${frameType(frame)}`;
+      title.appendChild(b);
+      title.appendChild(s);
+
+      const right = document.createElement("div");
+      right.style.display = "flex";
+      right.style.alignItems = "center";
+      right.style.gap = "6px";
+
+      if (
+        STATE.startFrameId != null &&
+        Number(STATE.startFrameId) === Number(node.frameId)
+      ) {
+        const badge = document.createElement("span");
+        badge.className = "ngv2-badge start";
+        badge.textContent = "START";
+        right.appendChild(badge);
+      }
+
+      if (frameType(frame) === "instant") {
+        const badge = document.createElement("span");
+        badge.className = "ngv2-badge instant";
+        badge.textContent = "INSTANT";
+        right.appendChild(badge);
+      }
+
+      header.appendChild(title);
+      header.appendChild(right);
+
+      // body
+      const body = document.createElement("div");
+      body.className = "ngv2-nodeBody";
+
+      const ports = getPortsForNode(node);
+
+      // Ports grouped into two columns:
+      // - IN on the left
+      // - OUT on the right
+      const portsGrid = document.createElement("div");
+      portsGrid.className = "ngv2-portsGrid";
+
+      const inCol = document.createElement("div");
+      inCol.className = "ngv2-portCol in";
+
+      const inTitle = document.createElement("div");
+      inTitle.className = "ngv2-portColTitle in";
+      inTitle.textContent = "IN";
+      inCol.appendChild(inTitle);
+
+      // Inputs (currently only one: "in")
+      for (const pIn of ports.inputs) {
+        inCol.appendChild(renderPort(node, "in", pIn));
+      }
+
+      const outCol = document.createElement("div");
+      outCol.className = "ngv2-portCol out";
+
+      const outTitle = document.createElement("div");
+      outTitle.className = "ngv2-portColTitle out";
+      outTitle.textContent = "OUT";
+      outCol.appendChild(outTitle);
+
+      // Outputs (Next + Jump Choices)
+      for (const pOut of ports.outputs) {
+        outCol.appendChild(renderPort(node, "out", pOut));
+      }
+
+      portsGrid.appendChild(inCol);
+      portsGrid.appendChild(outCol);
+
+      body.appendChild(portsGrid);
+
+      el.appendChild(header);
+      el.appendChild(body);
+
+      return el;
+    }
+
+    function renderPort(node, side, port) {
+      const el = document.createElement("div");
+      el.className = "ngv2-port";
+      el.setAttribute("data-port", safeId(port.id));
+      el.setAttribute("data-node", safeId(node.id));
+      el.setAttribute("data-side", side);
+
+      // dot
+      const dot = document.createElement("div");
+      dot.className = "ngv2-dot";
+      if (side === "in") dot.classList.add("in");
+      if (port.kind === "next") dot.classList.add("next");
+      if (port.kind === "choice") dot.classList.add("choice");
+
+      // label
+      const label = document.createElement("div");
+      label.className = "ngv2-portLabel";
+      label.textContent = port.label;
+
+      el.appendChild(dot);
+      el.appendChild(label);
+
+      // connectable/disabled hinting when armed
+      if (STATE.selectingFrom) {
+        if (side === "in") {
+          // can we connect from selectingFrom to this node?
+          const ok = validateConnection(
+            {
+              nodeId: STATE.selectingFrom.nodeId,
+              portId: STATE.selectingFrom.portId,
+            },
+            { nodeId: node.id, portId: "in" },
+          );
+          if (ok.ok) el.classList.add("connectable");
+          else el.classList.add("disabled");
+        } else {
+          // outputs are not targets while armed
+        }
+      }
+
+      // selected output highlight
+      if (
+        STATE.selectingFrom &&
+        side === "out" &&
+        safeId(STATE.selectingFrom.nodeId) === safeId(node.id) &&
+        safeId(STATE.selectingFrom.portId) === safeId(port.id)
+      ) {
+        el.classList.add("selected");
+      }
+
+      return el;
+    }
+
+    function renderInspector() {
+      // Inspector panel removed (single-surface UX).
+      return;
+    }
+
+    function shortPortLabel(from) {
+      const n = getNode(from.nodeId);
+      const f = n ? getFrameById(n.frameId) : null;
+      const pid = safeId(from.portId);
+
+      let p = pid;
+      if (pid === "next") p = "Next";
+      else if (pid.startsWith("choice:")) p = "Choice";
+
+      return `#${f?.id ?? n?.frameId ?? "?"} (${p})`;
+    }
+
+    function render() {
+      if (!STATE.open) return;
+      const canvas = STATE.ui.canvas;
+      if (!canvas) return;
+
+      // clear
+      canvas.innerHTML = "";
+
+      // render nodes
+      for (const node of STATE.nodes) {
+        const el = renderNode(node);
+        canvas.appendChild(el);
+      }
+
+      // links overlay
+      renderLinks();
+
+      // inspector removed
+    }
+
+    function fitToContent() {
+      const wrap = STATE.ui.canvasWrap;
+      if (!wrap) return;
+
+      if (!STATE.nodes.length) return;
+
+      let minX = Infinity,
+        minY = Infinity,
+        maxX = -Infinity,
+        maxY = -Infinity;
+
+      for (const n of STATE.nodes) {
+        minX = Math.min(minX, n.x);
+        minY = Math.min(minY, n.y);
+        maxX = Math.max(maxX, n.x + CFG.node.w);
+        maxY = Math.max(maxY, n.y + CFG.node.headerH + 6 * CFG.node.rowH);
+      }
+
+      const pad = 140;
+      minX -= pad;
+      minY -= pad;
+      maxX += pad;
+      maxY += pad;
+
+      const rect = wrap.getBoundingClientRect();
+      const vpW = rect.width;
+      const vpH = rect.height;
+
+      const contentW = Math.max(1, maxX - minX);
+      const contentH = Math.max(1, maxY - minY);
+
+      const scale = clamp(
+        Math.min(vpW / contentW, vpH / contentH),
+        CFG.minScale,
+        CFG.maxScale,
+      );
+
+      STATE.viewport.scale = scale;
+      STATE.viewport.x = vpW / 2 - ((minX + maxX) / 2) * scale;
+      STATE.viewport.y = vpH / 2 - ((minY + maxY) / 2) * scale;
+
+      saveToChapter("fit");
+      render();
+    }
+
+    function autoLayout() {
+      const frames = getFrames();
+      const byId = new Map(frames.map((f) => [Number(f?.id), f]));
+      const orderedNodes = [...STATE.nodes].sort(
+        (a, b) => Number(a.frameId) - Number(b.frameId),
+      );
+
+      // Simple layout: main frames in a row, instant frames slightly below.
+      let x = 180;
+      let yMain = 160;
+      let yInstant = 360;
+
+      for (const n of orderedNodes) {
+        const f = byId.get(Number(n.frameId));
+        const t = frameType(f);
+        n.x = x;
+        n.y = t === "instant" ? yInstant : yMain;
+        x += CFG.node.w + 140;
+      }
+    }
+
+    // -------------------------
+    // Events
+    // -------------------------
+
+    function getPortFromTarget(target) {
+      const el = target?.closest?.("[data-port][data-node][data-side]");
+      if (!el) return null;
+      return {
+        nodeId: el.getAttribute("data-node"),
+        portId: el.getAttribute("data-port"),
+        side: el.getAttribute("data-side"),
+      };
+    }
+
+    function wireEvents() {
+      const wrap = STATE.ui.canvasWrap;
+      if (!wrap) return;
+
+      const getClient = (e) => ({ x: e.clientX, y: e.clientY });
+
+      // Zoom
+      wrap.addEventListener(
+        "wheel",
+        (e) => {
+          if (!STATE.open) return;
+          e.preventDefault();
+
+          const rect = wrap.getBoundingClientRect();
+          const mouse = { x: e.clientX - rect.left, y: e.clientY - rect.top };
+          const before = screenToWorld(mouse);
+
+          const delta = e.deltaY;
+          const factor = delta > 0 ? 0.92 : 1.08;
+          const nextScale = clamp(
+            STATE.viewport.scale * factor,
+            CFG.minScale,
+            CFG.maxScale,
+          );
+          STATE.viewport.scale = nextScale;
+
+          const after = screenToWorld(mouse);
+          // keep world point under cursor stable
+          STATE.viewport.x += (after.x - before.x) * STATE.viewport.scale;
+          STATE.viewport.y += (after.y - before.y) * STATE.viewport.scale;
+
+          saveToChapter("zoom");
+          render();
+        },
+        { passive: false },
+      );
+
+      // Mouse down
+      wrap.addEventListener("mousedown", (e) => {
+        if (!STATE.open) return;
+
+        // middle mouse pans
+        if (e.button === 1) {
+          e.preventDefault();
+          const mouse = getClient(e);
+          STATE.drag = {
+            mode: "pan",
+            start: { x: mouse.x, y: mouse.y },
+            origin: { x: STATE.viewport.x, y: STATE.viewport.y },
+          };
+          wrap.style.cursor = "grabbing";
+          return;
+        }
+
+        // space + left pans
+        if (
+          e.button === 0 &&
+          e.getModifierState &&
+          e.getModifierState(" " /* not reliable */)
+        ) {
+          // Not all browsers expose "Space" this way; we also handle keydown.
+        }
+
+        const target = e.target;
+
+        const port = getPortFromTarget(target);
+        if (port) {
+          e.preventDefault();
+          e.stopPropagation();
+
+          // Input click when not armed: if has incoming, remove ALL incoming links into this node.
+          if (!STATE.selectingFrom && port.side === "in") {
+            const removed = removeLinksWhere(
+              (l) =>
+                safeId(l?.to?.nodeId) === safeId(port.nodeId) &&
+                safeId(l?.to?.portId) === "in",
+            );
+            if (removed) {
+              saveToChapter("disconnect_incoming");
+              render();
+              toast("Disconnected incoming links.");
+            } else {
+              toast("Click an output (Next/Choice) first.");
+            }
+            return;
+          }
+
+          // Output click arms
+          if (!STATE.selectingFrom && port.side === "out") {
+            STATE.selectingFrom = { nodeId: port.nodeId, portId: port.portId };
+            toast(`Selected: ${port.portId}`);
+            render();
+            return;
+          }
+
+          // Clicking same output cancels
+          if (
+            STATE.selectingFrom &&
+            port.side === "out" &&
+            safeId(STATE.selectingFrom.nodeId) === safeId(port.nodeId) &&
+            safeId(STATE.selectingFrom.portId) === safeId(port.portId)
+          ) {
+            STATE.selectingFrom = null;
+            toast("Canceled.");
+            render();
+            return;
+          }
+
+          // Armed + click input => connect
+          if (STATE.selectingFrom && port.side === "in") {
+            const ok = upsertLink(
+              {
+                nodeId: STATE.selectingFrom.nodeId,
+                portId: STATE.selectingFrom.portId,
+              },
+              { nodeId: port.nodeId, portId: "in" },
+            );
+            if (!ok.ok) {
+              toast(ok.reason);
+              return;
+            }
+            STATE.selectingFrom = null;
+            saveToChapter("connect");
+            render();
+            toast("Connected.");
+            return;
+          }
+
+          return;
+        }
+
+        // Node drag
+        const nodeEl = target.closest?.("[data-node]:not([data-port])");
+        const rect = wrap.getBoundingClientRect();
+        const mouse = { x: e.clientX - rect.left, y: e.clientY - rect.top };
+        const world = screenToWorld(mouse);
+
+        if (nodeEl) {
+          const nodeId = nodeEl.getAttribute("data-node");
+          const node = getNode(nodeId);
+          if (!node) return;
+
+          STATE.selectedNodeId = nodeId;
+          STATE.drag = {
+            mode: "node",
+            nodeId,
+            start: { x: world.x, y: world.y },
+            origin: { x: node.x, y: node.y },
+          };
+          render();
+          return;
+        }
+
+        // empty space
+        STATE.selectedNodeId = null;
+
+        // if armed and click empty space: if there is an existing outgoing link, remove it; else cancel
+        if (STATE.selectingFrom) {
+          const existing = findExistingFromLink(
+            STATE.selectingFrom.nodeId,
+            STATE.selectingFrom.portId,
+          );
+          if (existing) {
+            const removed = deleteLink(existing.id);
+            STATE.selectingFrom = null;
+            if (removed) {
+              saveToChapter("disconnect_outgoing");
+              render();
+              toast("Disconnected.");
+              return;
+            }
+          }
+          STATE.selectingFrom = null;
+          render();
+          toast("Canceled.");
+        } else {
+          render();
+        }
+      });
+
+      // Mouse move
+      window.addEventListener("mousemove", (e) => {
+        if (!STATE.open) return;
+
+        const wrap = STATE.ui.canvasWrap;
+        if (!wrap) return;
+
+        const rect = wrap.getBoundingClientRect();
+        const mouse = { x: e.clientX - rect.left, y: e.clientY - rect.top };
+        const world = screenToWorld(mouse);
+
+        STATE._mouseWorld = world;
+        STATE.hoverPort = getPortFromTarget(e.target);
+
+        if (STATE.drag?.mode === "pan") {
+          const client = getClient(e);
+          STATE.viewport.x =
+            STATE.drag.origin.x + (client.x - STATE.drag.start.x);
+          STATE.viewport.y =
+            STATE.drag.origin.y + (client.y - STATE.drag.start.y);
+          render();
+          return;
+        }
+
+        if (STATE.drag?.mode === "node") {
+          const node = getNode(STATE.drag.nodeId);
+          if (!node) return;
+
+          const dx = world.x - STATE.drag.start.x;
+          const dy = world.y - STATE.drag.start.y;
+
+          node.x = snap(STATE.drag.origin.x + dx, CFG.grid);
+          node.y = snap(STATE.drag.origin.y + dy, CFG.grid);
+
+          render();
+          return;
+        }
+
+        if (STATE.selectingFrom) {
+          renderLinks(); // update ghost without full DOM rebuild
+        }
+      });
+
+      // Mouse up
+      window.addEventListener("mouseup", () => {
+        if (!STATE.open) return;
+
+        const wrap = STATE.ui.canvasWrap;
+        if (!wrap) return;
+
+        if (STATE.drag) {
+          const mode = STATE.drag.mode;
+          STATE.drag = null;
+          wrap.style.cursor = "grab";
+          saveToChapter(mode === "node" ? "move_node" : "pan");
+          render();
+        }
+      });
+
+      // Keydown
+      window.addEventListener("keydown", (e) => {
+        if (!STATE.open) return;
+
+        if (e.key === "Escape") {
+          if (STATE.selectingFrom) {
+            STATE.selectingFrom = null;
+            render();
+            toast("Canceled.");
+            return;
+          }
+        }
+
+        if (e.key === "Delete" || e.key === "Backspace") {
+          if (!STATE.selectedNodeId) return;
+
+          const nodeId = STATE.selectedNodeId;
+          // delete incoming + outgoing links for selected node
+          const changed = removeLinksWhere(
+            (l) =>
+              safeId(l?.from?.nodeId) === safeId(nodeId) ||
+              safeId(l?.to?.nodeId) === safeId(nodeId),
+          );
+          if (changed) {
+            saveToChapter("delete_links_for_node");
+            render();
+            toast("Links removed.");
+          }
+          return;
+        }
+
+        // Ctrl+0 reset zoom
+        if ((e.ctrlKey || e.metaKey) && e.key === "0") {
+          STATE.viewport.scale = 1;
+          STATE.viewport.x = 0;
+          STATE.viewport.y = 0;
+          saveToChapter("reset_view");
+          render();
+        }
+      });
+    }
+
+    // -------------------------
+    // Public API
+    // -------------------------
+
+    function open(chapterId) {
+      ensureUI();
+
+      STATE.open = true;
+      STATE.selectedNodeId = null;
+      STATE.selectingFrom = null;
+      STATE.hoverPort = null;
+      STATE._mouseWorld = null;
+
+      loadFromChapter(chapterId);
+
+      // Title
+      const ch = getChapter();
+      if (STATE.ui.headerTitle) {
+        STATE.ui.headerTitle.textContent =
+          "Storyline Node Editor " + (ch ? ` - ${ch.title || "Chapter"}` : "");
+      }
+
+      STATE.ui.overlay.style.display = "flex";
+      render();
+
+      // Start in a good view if viewport is default
+      if (
+        (!STATE.viewport.x &&
+          !STATE.viewport.y &&
+          STATE.viewport.scale === 1) ||
+        (getChapter()?.[STORAGE_KEY]?.nodes?.length ?? 0) === 0
+      ) {
+        fitToContent();
+      }
+    }
+
+    function close() {
+      if (!STATE.ui.overlay) return;
+      STATE.open = false;
+      STATE.selectingFrom = null;
+      STATE.drag = null;
+      STATE.ui.overlay.style.display = "none";
+    }
+
+    function isOpen() {
+      return !!STATE.open;
+    }
+
+    return {
+      open,
+      close,
+      isOpen,
+      _state: STATE, // for debugging
+    };
+  })();
+
+  // expose globally
+  window.NodeGraphV2 = NodeGraphV2;
+
+  // Optional helper function for UI binding
+  // You can call `openNodeGraphV2()` from your menus if desired.
+  if (typeof window.openNodeGraphV2 !== "function") {
+    window.openNodeGraphV2 = function () {
+      if (window.NodeGraphV2 && typeof window.NodeGraphV2.open === "function") {
+        window.NodeGraphV2.open(
+          typeof activeChapterId !== "undefined" ? activeChapterId : null,
+        );
+      }
+    };
+  }
+})();

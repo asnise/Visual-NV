@@ -3,7 +3,8 @@ let previousCharRects = new Map();
 let typingTimer = null;
 let lastMainFrameIndex = -1;
 
-let instantReturnIndex = null;
+// Legacy "choice -> instant -> return to main timeline" state removed.
+// Preview progression is now driven only by explicit graph connections (Next / Choice targets).
 
 function updatePreviewRatio() {
   const vp = document.getElementById("pViewport");
@@ -57,7 +58,6 @@ function renderPreviewFrame() {
 
   if (!frame.frameType || frame.frameType === "main") {
     lastMainFrameIndex = previewCurrentIndex;
-    instantReturnIndex = null;
   }
 
   const bgObj = project.assets.backgrounds.find(
@@ -248,84 +248,87 @@ function nextPreview() {
   const chapter = getChapter();
   const currentFrame = chapter.frames[previewCurrentIndex];
 
+  // If this frame has choices, user must pick a choice (click-to-advance is blocked).
   if (currentFrame && currentFrame.choices && currentFrame.choices.length > 0)
     return;
 
   const isInstant = currentFrame && currentFrame.frameType === "instant";
 
+  // No timeline fallback: instant frames also require an explicit Next connection.
+  // If there is no Next, the preview ends.
   if (isInstant) {
-    const returnIdx = Number.isInteger(instantReturnIndex)
-      ? instantReturnIndex
-      : null;
+    const nextId =
+      currentFrame &&
+      currentFrame.attributes &&
+      currentFrame.attributes.next &&
+      String(currentFrame.attributes.next).trim();
 
-    if (returnIdx !== null) {
-      previewCurrentIndex = returnIdx + 1;
-      instantReturnIndex = null;
-
-      while (
-        previewCurrentIndex < chapter.frames.length &&
-        chapter.frames[previewCurrentIndex].frameType === "instant"
-      ) {
-        previewCurrentIndex++;
-      }
-
-      if (previewCurrentIndex < chapter.frames.length) {
-        renderPreviewFrame();
-      } else {
-        closeModal("previewModal");
-        window.removeEventListener("resize", updatePreviewRatio);
-        if (typingTimer) clearTimeout(typingTimer);
-      }
+    if (!nextId) {
+      closeModal("previewModal");
+      window.removeEventListener("resize", updatePreviewRatio);
+      if (typingTimer) clearTimeout(typingTimer);
       return;
     }
 
-    closeModal("previewModal");
-    window.removeEventListener("resize", updatePreviewRatio);
-    if (typingTimer) clearTimeout(typingTimer);
-    return;
-  }
-
-  let nextIdx = previewCurrentIndex + 1;
-  while (
-    nextIdx < chapter.frames.length &&
-    chapter.frames[nextIdx].frameType === "instant"
-  ) {
-    nextIdx++;
-  }
-
-  if (nextIdx < chapter.frames.length) {
-    previewCurrentIndex = nextIdx;
-    renderPreviewFrame();
-  } else {
-    closeModal("previewModal");
-    window.removeEventListener("resize", updatePreviewRatio);
-    if (typingTimer) clearTimeout(typingTimer);
-  }
-}
-
-function prevPreview() {
-  const chapter = getChapter();
-  const currentFrame = chapter.frames[previewCurrentIndex];
-
-  if (currentFrame && currentFrame.frameType === "instant") {
-    if (Number.isInteger(instantReturnIndex)) {
-      previewCurrentIndex = instantReturnIndex;
-      instantReturnIndex = null;
-      renderPreviewFrame();
+    const targetId = parseInt(nextId, 10);
+    if (!Number.isFinite(targetId)) {
+      closeModal("previewModal");
+      window.removeEventListener("resize", updatePreviewRatio);
+      if (typingTimer) clearTimeout(typingTimer);
+      return;
     }
+
+    const targetIdx = chapter.frames.findIndex((f) => f.id === targetId);
+    if (targetIdx === -1) {
+      closeModal("previewModal");
+      window.removeEventListener("resize", updatePreviewRatio);
+      if (typingTimer) clearTimeout(typingTimer);
+      return;
+    }
+
+    previewCurrentIndex = targetIdx;
+    renderPreviewFrame();
     return;
   }
 
-  let prevIdx = previewCurrentIndex - 1;
-  while (prevIdx >= 0 && chapter.frames[prevIdx].frameType === "instant") {
-    prevIdx--;
+  // NEW FLOW RULE:
+  // No more automatic "next frame by array order".
+  // Only advance if there is an explicit Next link from the Node Editor V2.
+  const nextId =
+    currentFrame &&
+    currentFrame.attributes &&
+    currentFrame.attributes.next &&
+    String(currentFrame.attributes.next).trim();
+
+  if (!nextId) {
+    // No explicit connection => end preview immediately.
+    closeModal("previewModal");
+    window.removeEventListener("resize", updatePreviewRatio);
+    if (typingTimer) clearTimeout(typingTimer);
+    return;
   }
 
-  if (prevIdx >= 0) {
-    previewCurrentIndex = prevIdx;
-    renderPreviewFrame();
+  const targetId = parseInt(nextId, 10);
+  if (!Number.isFinite(targetId)) {
+    closeModal("previewModal");
+    window.removeEventListener("resize", updatePreviewRatio);
+    if (typingTimer) clearTimeout(typingTimer);
+    return;
   }
+
+  const targetIdx = chapter.frames.findIndex((f) => f.id === targetId);
+  if (targetIdx === -1) {
+    closeModal("previewModal");
+    window.removeEventListener("resize", updatePreviewRatio);
+    if (typingTimer) clearTimeout(typingTimer);
+    return;
+  }
+
+  previewCurrentIndex = targetIdx;
+  renderPreviewFrame();
 }
+
+// prevPreview() removed: previous-frame navigation UI has been removed.
 
 function handleChoiceClick(choice) {
   if (choice.type === "jump") {
@@ -334,13 +337,9 @@ function handleChoiceClick(choice) {
     const targetIdx = chapter.frames.findIndex((f) => f.id === targetId);
 
     if (targetIdx !== -1) {
-      const targetFrame = chapter.frames[targetIdx];
-      if (targetFrame && targetFrame.frameType === "instant") {
-        instantReturnIndex = previewCurrentIndex;
-      } else {
-        instantReturnIndex = null;
-      }
-
+      // No "return to main timeline" behavior anymore.
+      // After taking a choice, the preview can only continue if the target frame
+      // (or subsequent frames) have an explicit Next connection.
       previewCurrentIndex = targetIdx;
       renderPreviewFrame();
     } else {

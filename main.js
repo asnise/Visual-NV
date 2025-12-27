@@ -44,6 +44,80 @@ let project = {
   ],
 };
 
+/**
+ * Project auto-save/restore (refresh-safe) via localStorage
+ * - Stores project graph + editor selection state (chapter/frame/slot/tab)
+ * - Versioned payload to allow future migrations
+ */
+const VN_LOCAL_PROJECT_KEY = "vnEditorProject_v1";
+const VN_LOCAL_PROJECT_VERSION = 1;
+
+let __saveTimer = null;
+function scheduleAutoSave(reason = "") {
+  // Debounce frequent edits (dragging, typing) to reduce localStorage churn
+  if (__saveTimer) clearTimeout(__saveTimer);
+  __saveTimer = setTimeout(() => {
+    try {
+      const payload = {
+        v: VN_LOCAL_PROJECT_VERSION,
+        savedAt: Date.now(),
+        reason,
+        data: {
+          project,
+          ui: {
+            activeChapterId,
+            activeFrameIndex,
+            selectedSlotIndex,
+            activeFilmstripTab,
+            stageView,
+            editorState,
+          },
+        },
+      };
+      localStorage.setItem(VN_LOCAL_PROJECT_KEY, JSON.stringify(payload));
+    } catch (e) {
+      // quota/full or blocked; ignore to avoid breaking editor flow
+    }
+  }, 200);
+}
+
+// Expose autosave globally so other modules (e.g. NodeGraph) can trigger refresh-safe saves
+try {
+  window.scheduleAutoSave = scheduleAutoSave;
+} catch (e) {}
+
+function tryRestoreFromLocalStorage() {
+  try {
+    const raw = localStorage.getItem(VN_LOCAL_PROJECT_KEY);
+    if (!raw) return false;
+
+    const payload = JSON.parse(raw);
+    if (!payload || payload.v !== VN_LOCAL_PROJECT_VERSION) return false;
+    if (!payload.data || !payload.data.project) return false;
+
+    project = payload.data.project;
+
+    const ui = payload.data.ui || {};
+    if (typeof ui.activeChapterId === "number")
+      activeChapterId = ui.activeChapterId;
+    if (typeof ui.activeFrameIndex === "number")
+      activeFrameIndex = ui.activeFrameIndex;
+    if (typeof ui.selectedSlotIndex === "number")
+      selectedSlotIndex = ui.selectedSlotIndex;
+    if (typeof ui.activeFilmstripTab === "string")
+      activeFilmstripTab = ui.activeFilmstripTab;
+
+    if (ui.stageView && typeof ui.stageView === "object")
+      stageView = { ...stageView, ...ui.stageView };
+    if (ui.editorState && typeof ui.editorState === "object")
+      editorState = { ...editorState, ...ui.editorState };
+
+    return true;
+  } catch (e) {
+    return false;
+  }
+}
+
 let activeChapterId = 1;
 let activeFrameIndex = 0;
 let selectedSlotIndex = -1;
@@ -175,6 +249,7 @@ function addChapter() {
   });
   renderChapterMgmt();
   loadChapter(id);
+  scheduleAutoSave("add_chapter");
 }
 
 function deleteChapter(id) {
@@ -182,6 +257,7 @@ function deleteChapter(id) {
   project.chapters = project.chapters.filter((c) => c.id !== id);
   loadChapter(project.chapters[0].id);
   renderChapterMgmt();
+  scheduleAutoSave("delete_chapter");
 }
 
 function addFrame() {
@@ -201,10 +277,12 @@ function addFrame() {
   }
   chapter.frames.push(newFrame);
   switchFrame(chapter.frames.length - 1);
+  scheduleAutoSave("add_frame");
 }
 
 function deleteFrame() {
   removeFrameAt(activeFrameIndex);
+  scheduleAutoSave("delete_frame");
 }
 
 function updateSlotProp(key, val) {
@@ -216,12 +294,14 @@ function updateSlotProp(key, val) {
   } else slot[key] = val;
   renderStage();
   renderFilmstrip();
+  scheduleAutoSave("update_slot");
 }
 
 function updateText(val) {
   getFrame().text = val;
   renderStage();
   renderFilmstrip();
+  scheduleAutoSave("update_text");
 }
 
 function updateFrameChoice(index, key, val) {
@@ -277,11 +357,13 @@ function deleteExecuteFunction(index) {
 function updateSpeaker(val) {
   getFrame().speakerId = val;
   renderStage();
+  scheduleAutoSave("update_speaker");
 }
 
 function updateBackground(val) {
   getFrame().background = val;
   renderStage();
+  scheduleAutoSave("update_background");
 }
 
 function switchFilmstripTab(tab) {
@@ -291,6 +373,7 @@ function switchFilmstripTab(tab) {
   });
   renderFilmstrip();
   renderInspector();
+  scheduleAutoSave("switch_filmstrip_tab");
 }
 
 function updateFrameType(type) {
@@ -302,6 +385,7 @@ function updateFrameType(type) {
   }
   renderInspector();
   renderFilmstrip();
+  scheduleAutoSave("update_frame_type");
 }
 
 function updateReturnToFrame(value) {
@@ -318,6 +402,7 @@ function loadChapter(id) {
   closeModal("chapterModal");
   if (getChapter().frames.length === 0) addFrame();
   switchFrame(0);
+  scheduleAutoSave("load_chapter");
 }
 
 function switchFrame(index) {
@@ -326,12 +411,14 @@ function switchFrame(index) {
   renderStage();
   renderInspector();
   renderFilmstrip();
+  scheduleAutoSave("switch_frame");
 }
 
 function selectSlot(index) {
   selectedSlotIndex = index;
   renderStage();
   renderInspector();
+  scheduleAutoSave("select_slot");
 }
 
 function clearSlot(index) {
@@ -340,6 +427,7 @@ function clearSlot(index) {
   renderStage();
   renderInspector();
   renderFilmstrip();
+  scheduleAutoSave("clear_slot");
 }
 
 function addCharToSlot(index, charId) {
@@ -364,6 +452,7 @@ function addCharToSlot(index, charId) {
   renderStage();
   renderInspector();
   renderFilmstrip();
+  scheduleAutoSave("add_char_to_slot");
 }
 
 function moveCharSlot(fromIndex, toIndex) {
@@ -377,6 +466,7 @@ function moveCharSlot(fromIndex, toIndex) {
   renderStage();
   renderInspector();
   renderFilmstrip();
+  scheduleAutoSave("move_char_slot");
 }
 
 function addCharacter() {
@@ -624,6 +714,14 @@ function renderInspector() {
   const execEl = container.querySelector("#details-exec");
   const execOpen = execEl ? execEl.hasAttribute("open") : true;
 
+  // Per-choice expand/collapse state (persisted across renders)
+  const choiceOpenMap = {};
+  container
+    .querySelectorAll("[data-choice-open]")
+    .forEach(
+      (el) => (choiceOpenMap[el.getAttribute("data-choice-open")] = true),
+    );
+
   const frame = getFrame();
 
   const iconExpanded = `
@@ -700,8 +798,16 @@ function renderInspector() {
                   : "Function Name";
               const targetPlaceholder =
                 type === "jump" ? "Frame ID" : "myFunction()";
+
+              const isOpen = !!choiceOpenMap[String(i)];
+
               return `
-              <div style="background: rgba(0,0,0,0.05); padding: 8px; border-radius: 4px; margin-bottom: 8px; border: 1px solid var(--border);">
+              <details data-choice-open="${isOpen ? i : ""}" style="background: rgba(0,0,0,0.05); padding: 8px; border-radius: 4px; margin-bottom: 8px; border: 1px solid var(--border);" ${isOpen ? "open" : ""}>
+                  <summary style="list-style:none; cursor:pointer; user-select:none; display:flex; align-items:center; gap:6px; margin-bottom: 8px;">
+                    <span style="font-weight:700;">Choice ${i + 1}</span>
+                    <span style="font-size:11px; opacity:0.7; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${(c.text || "").replace(/</g, "&lt;").replace(/>/g, "&gt;")}</span>
+                  </summary>
+
                   <div style="margin-bottom: 4px;">
                       <label style="font-size: 11px; opacity: 0.7;">Type</label>
                       <select class="inspector-input" onchange="updateFrameChoice(${i}, 'type', this.value)" style="width: 100%; box-sizing: border-box;">
@@ -717,9 +823,9 @@ function renderInspector() {
                     type === "jump"
                       ? `<div style="margin-bottom: 4px;">
                           <label style="font-size: 11px; opacity: 0.7;">${targetLabel}</label>
-                          <div class="inspector-input" style="width: 100%; box-sizing: border-box; opacity: 0.75;">
-                            Connect this Choice in the Node Graph to set its target.
-                          </div>
+                          <button class="primary-btn small" type="button" onclick="openNodeGraphV2()" style="width: 100%;">
+                            Open Storyline Node Editor
+                          </button>
                         </div>`
                       : `<div style="margin-bottom: 4px;">
                           <label style="font-size: 11px; opacity: 0.7;">${targetLabel}</label>
@@ -727,7 +833,7 @@ function renderInspector() {
                         </div>`
                   }
                   <button class="danger small" onclick="removeFrameChoice(${i})" style="width: 100%; margin-top: 4px;">Remove</button>
-              </div>`;
+              </details>`;
             })
             .join("")}
           <button class="primary-btn small" onclick="addFrameChoice()" style="width: 100%;">+ Add Choice</button>
@@ -1029,6 +1135,7 @@ function saveOverlayPosition() {
   closeModal("overlayModal");
   renderCharModal();
   renderStage();
+  scheduleAutoSave("save_overlay_position");
 }
 
 function dragStartNew(ev) {
@@ -1114,6 +1221,7 @@ function pasteFrameAt(idx) {
   const cloned = createFrameFromTemplate(frameClipboard);
   getChapter().frames.splice(idx + 1, 0, cloned);
   switchFrame(idx + 1);
+  scheduleAutoSave("paste_frame");
 }
 
 function contextMenuAction(act) {
@@ -1256,6 +1364,7 @@ async function importJSON(e) {
       activeChapterId = project.chapters[0].id;
       loadChapter(activeChapterId);
       renderCastPalette();
+      scheduleAutoSave("import_project");
     } else alert("Invalid format");
   } catch (err) {
     console.error(err);
@@ -1273,6 +1382,11 @@ function openModal(id) {
 }
 
 function closeModal(id) {
+  // Special handling for settings modal - should use cancelSettings() instead
+  if (id === "settingsModal" && typeof cancelSettings === "function") {
+    cancelSettings();
+    return;
+  }
   document.getElementById(id).style.display = "none";
 }
 
@@ -1469,18 +1583,26 @@ function renderChapterMgmt() {
 }
 
 function init() {
+  // Attempt restore before first render
+  tryRestoreFromLocalStorage();
+
   renderCastPalette();
-  loadChapter(1);
+  // Load active chapter if possible; otherwise default to 1
+  loadChapter(activeChapterId || 1);
+
   if (!project.assets.backgrounds.length)
     project.assets.backgrounds.push({
       name: "default_bg",
       url: "",
     });
+
   initOverlayEditorEvents();
+
   document.addEventListener("click", (e) => {
     if (!document.getElementById("slideContextMenu").contains(e.target))
       hideSlideContextMenu();
   });
+
   document.getElementById("bgFileInput").addEventListener("change", (e) => {
     const file = e.target.files[0];
     if (!file) return;
@@ -1493,11 +1615,16 @@ function init() {
         fileName: fn,
       });
       renderAssetModal();
+      scheduleAutoSave("add_background");
     });
   });
+
   renderInspector();
   renderFilmstrip();
   renderStage();
+
+  // Save once after initial hydrate to normalize the payload (and ensure key exists)
+  scheduleAutoSave("init");
 
   if (typeof initSettingsModal === "function") {
     initSettingsModal();
