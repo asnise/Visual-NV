@@ -255,7 +255,13 @@ function newProject() {
         id: Date.now(),
         title: "New Project",
         frames: [
-          { id: Date.now() + 1, text: "Start", speakerId: "", background: "none", slots: [null, null, null, null] },
+          {
+            id: Date.now() + 1,
+            text: "Start",
+            speakerId: "",
+            background: "none",
+            slots: [null, null, null, null],
+          },
         ],
       },
     ],
@@ -265,7 +271,8 @@ function newProject() {
   loadChapter(activeChapterId);
   renderCastPalette();
   scheduleAutoSave("new_project");
-  if (typeof showToast === "function") showToast("New project created", "success");
+  if (typeof showToast === "function")
+    showToast("New project created", "success");
 }
 
 function deleteChapter(id) {
@@ -1317,7 +1324,9 @@ async function saveJSON() {
 
     if (window.CompressionStream) {
       const stream = new Blob([jsonString]).stream();
-      const compressedStream = stream.pipeThrough(new CompressionStream("gzip"));
+      const compressedStream = stream.pipeThrough(
+        new CompressionStream("gzip"),
+      );
       const compressedBlob = await new Response(compressedStream).blob();
 
       const a = document.createElement("a");
@@ -1404,10 +1413,10 @@ async function importJSON(e) {
     } else alert("Invalid format");
   } catch (err) {
     console.error(err);
-      alert("Parse error");
+    alert("Parse error");
   }
   e.target.value = "";
-    if (typeof hideLoading === "function") hideLoading();
+  if (typeof hideLoading === "function") hideLoading();
 }
 
 function openModal(id) {
@@ -1430,7 +1439,7 @@ function renderCharModal() {
   const listPane = document.getElementById("charListPane");
   const editPane = document.getElementById("charEditPane");
 
-  listPane.innerHTML = project.characters
+  const charListHtml = project.characters
     .map((c) => {
       const thumb = c.bodies[0]?.url
         ? `background-image:url('${c.bodies[0].url}')`
@@ -1444,6 +1453,20 @@ function renderCharModal() {
             </div>`;
     })
     .join("");
+
+  listPane.innerHTML =
+    charListHtml +
+    `<div style="padding: 10px 0; text-align: center; margin-top: auto">
+        <button
+            class="primary-btn"
+            onclick="
+                addCharacter();
+                closeModal('characterModal');
+            "
+        >
+            + Add New Character
+        </button>
+    </div>`;
 
   if (!editingCharId) {
     editPane.innerHTML =
@@ -1505,11 +1528,12 @@ function renderCharModal() {
                   <h4 style="margin:0;font-size:14px;color:var(--text-main);">Expressions (Overlays)</h4>
                   <button class="primary-btn" onclick="addCharLayer('faces')">+ Add Expression</button>
               </div>
-              <div class="layers-list">
+              <div class="layers-list" style="margin-bottom:20px;">
                   ${facesHtml}
               </div>
           </div>
-      </div>`;
+      </div>
+  `;
 }
 
 function showLayerTab(tabName) {
@@ -1823,3 +1847,78 @@ function newProject() {
     scheduleAutoSave("new_project");
   }
 }
+
+let pinchActive = false;
+let pinchStartDist = 0;
+let pinchStartScale = 1;
+let pinchStartX = 0;
+let pinchStartY = 0;
+let pinchStartMidX = 0;
+let pinchStartMidY = 0;
+
+wrapper.addEventListener(
+  "touchstart",
+  (e) => {
+    if (!e.touches || e.touches.length !== 2) return;
+    e.preventDefault();
+
+    const t0 = e.touches[0];
+    const t1 = e.touches[1];
+    const dx = t0.clientX - t1.clientX;
+    const dy = t0.clientY - t1.clientY;
+    pinchStartDist = Math.hypot(dx, dy) || 1;
+
+    pinchStartScale = stageView.scale;
+    pinchStartX = stageView.x;
+    pinchStartY = stageView.y;
+
+    pinchStartMidX = (t0.clientX + t1.clientX) / 2;
+    pinchStartMidY = (t0.clientY + t1.clientY) / 2;
+
+    pinchActive = true;
+  },
+  { passive: false },
+);
+
+wrapper.addEventListener(
+  "touchmove",
+  (e) => {
+    if (!pinchActive || !e.touches || e.touches.length !== 2) return;
+    e.preventDefault();
+
+    const rect = wrapper.getBoundingClientRect();
+    const centerX = rect.left + rect.width / 2;
+    const centerY = rect.top + rect.height / 2;
+
+    const t0 = e.touches[0];
+    const t1 = e.touches[1];
+    const dx = t0.clientX - t1.clientX;
+    const dy = t0.clientY - t1.clientY;
+    const dist = Math.hypot(dx, dy) || 1;
+
+    const midX = (t0.clientX + t1.clientX) / 2;
+    const midY = (t0.clientY + t1.clientY) / 2;
+
+    const ratio = dist / pinchStartDist;
+    const newScale = Math.max(0.1, Math.min(5, pinchStartScale * ratio));
+    const appliedRatio = newScale / (pinchStartScale || 1);
+
+    const panDx = midX - pinchStartMidX;
+    const panDy = midY - pinchStartMidY;
+    const fromCenterX = midX - centerX;
+    const fromCenterY = midY - centerY;
+
+    stageView.scale = newScale;
+    stageView.x = pinchStartX + panDx + (1 - appliedRatio) * fromCenterX;
+    stageView.y = pinchStartY + panDy + (1 - appliedRatio) * fromCenterY;
+
+    updateStageTransform();
+  },
+  { passive: false },
+);
+
+const endPinch = () => {
+  pinchActive = false;
+};
+wrapper.addEventListener("touchend", endPinch, { passive: true });
+wrapper.addEventListener("touchcancel", endPinch, { passive: true });

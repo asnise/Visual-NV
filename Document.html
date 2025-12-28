@@ -1,204 +1,284 @@
 <!doctype html>
 <html lang="en">
-<head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>Document Visual VN Editor</title>
-  <style> 
-    body {
-      font-family: Inter, system-ui, Arial, sans-serif;
-      line-height: 1.6;
-      color: #0f172a;
-      background: #f8fafc;
-      padding: 28px;
-      margin: 0;
-    }
-    .wrap {
-      max-width: 1100px;
-      margin: 0 auto;
-      background: #fff;
-      padding: 28px;
-      border-radius: 10px;
-      box-shadow: 0 6px 24px rgba(2,6,23,0.06);
-    }
-    .header-row {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      margin-bottom: 20px;
-      border-bottom: 1px solid #e2e8f0;
-      padding-bottom: 20px;
-    }
-    h1 { font-size: 24px; margin: 0; }
-    h2 { font-size: 18px; margin-top: 24px; color: #334155; border-bottom: 1px solid #f1f5f9; padding-bottom: 6px; }
-    h3 { font-size: 16px; margin-top: 16px; color: #475569; }
-    p { margin: 8px 0; }
-    pre {
-      background: #0b1220;
-      color: #e6eef8;
-      padding: 16px;
-      border-radius: 6px;
-      overflow: auto;
-      font-size: 14px;
-      border: 1px solid #1e293b;
-    }
-    code {
-      font-family: Consolas, monospace;
-      background: #eef2ff;
-      color: #3730a3;
-      padding: 2px 6px;
-      border-radius: 4px;
-      font-size: 0.9em;
-    }
-    pre code {
-      background: transparent;
-      color: inherit;
-      padding: 0;
-    }
-    ul, ol { margin: 8px 0 8px 20px; }
-    li { margin-bottom: 4px; }
-    .note {
-      background: #f1f5f9;
-      padding: 12px 16px;
-      border-left: 4px solid #60a5fa;
-      border-radius: 6px;
-      margin: 16px 0;
-      font-size: 0.95em;
-    }
-    footer {
-      margin-top: 40px;
-      padding-top: 20px;
-      border-top: 1px solid #e2e8f0;
-      color: #64748b;
-      font-size: 0.85em;
-      text-align: center;
-    }
+    <head>
+        <meta charset="utf-8" />
+        <meta name="viewport" content="width=device-width,initial-scale=1" />
+        <title>Document Visual VN Editor</title>
+        <style>
+            body {
+                font-family: Inter, system-ui, Arial, sans-serif;
+                line-height: 1.6;
+                color: #0f172a;
+                background: #f8fafc;
+                padding: 28px;
+                margin: 0;
+            }
+            .wrap {
+                max-width: 1100px;
+                margin: 0 auto;
+                background: #fff;
+                padding: 28px;
+                border-radius: 10px;
+                box-shadow: 0 6px 24px rgba(2, 6, 23, 0.06);
+            }
+            .header-row {
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+                margin-bottom: 20px;
+                border-bottom: 1px solid #e2e8f0;
+                padding-bottom: 20px;
+            }
+            h1 {
+                font-size: 24px;
+                margin: 0;
+            }
+            h2 {
+                font-size: 18px;
+                margin-top: 24px;
+                color: #334155;
+                border-bottom: 1px solid #f1f5f9;
+                padding-bottom: 6px;
+            }
+            h3 {
+                font-size: 16px;
+                margin-top: 16px;
+                color: #475569;
+            }
+            p {
+                margin: 8px 0;
+            }
+            pre {
+                background: #0b1220;
+                color: #e6eef8;
+                padding: 16px;
+                border-radius: 6px;
+                overflow: auto;
+                font-size: 14px;
+                border: 1px solid #1e293b;
+            }
+            code {
+                font-family: Consolas, monospace;
+                background: #eef2ff;
+                color: #3730a3;
+                padding: 2px 6px;
+                border-radius: 4px;
+                font-size: 0.9em;
+            }
+            pre code {
+                background: transparent;
+                color: inherit;
+                padding: 0;
+            }
+            ul,
+            ol {
+                margin: 8px 0 8px 20px;
+            }
+            li {
+                margin-bottom: 4px;
+            }
+            .note {
+                background: #f1f5f9;
+                padding: 12px 16px;
+                border-left: 4px solid #60a5fa;
+                border-radius: 6px;
+                margin: 16px 0;
+                font-size: 0.95em;
+            }
+            footer {
+                margin-top: 40px;
+                padding-top: 20px;
+                border-top: 1px solid #e2e8f0;
+                color: #64748b;
+                font-size: 0.85em;
+                text-align: center;
+            }
 
-    /* Toggle Switch CSS */
-    .switch-container {
-      display: flex;
-      align-items: center;
-      gap: 10px;
-      font-weight: 600;
-      font-size: 14px;
-      color: #475569;
-    }
-    .switch {
-      position: relative;
-      display: inline-block;
-      width: 50px;
-      height: 26px;
-    }
-    .switch input {
-      opacity: 0;
-      width: 0;
-      height: 0;
-    }
-    .slider {
-      position: absolute;
-      cursor: pointer;
-      top: 0;
-      left: 0;
-      right: 0;
-      bottom: 0;
-      background-color: #cbd5e1;
-      transition: .4s;
-      border-radius: 34px;
-    }
-    .slider:before {
-      position: absolute;
-      content: "";
-      height: 18px;
-      width: 18px;
-      left: 4px;
-      bottom: 4px;
-      background-color: white;
-      transition: .4s;
-      border-radius: 50%;
-    }
-    input:checked + .slider {
-      background-color: #3b82f6;
-    }
-    input:checked + .slider:before {
-      transform: translateX(24px);
-    }
-    .lang-label {
-      cursor: pointer;
-      user-select: none;
-    }
-    .lang-label.active {
-      color: #0f172a;
-    }
-    
-    /* Utility for hiding sections */
-    .hidden {
-      display: none !important;
-    }
-  </style>
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/styles/atom-one-dark.min.css">
-</head>
-<body>
-  <div class="wrap">
-    
-    <div class="header-row">
-      <h1 id="doc-title">DocumentVisual VN Editor</h1>
-      
-      <div class="switch-container">
-        <span class="lang-label active" id="label-en" onclick="setLang('en')">EN</span>
-        <label class="switch">
-          <input type="checkbox" id="langToggle">
-          <span class="slider"></span>
-        </label>
-        <span class="lang-label" id="label-th" onclick="setLang('th')">TH</span>
-      </div>
-    </div>
+            /* Toggle Switch CSS */
+            .switch-container {
+                display: flex;
+                align-items: center;
+                gap: 10px;
+                font-weight: 600;
+                font-size: 14px;
+                color: #475569;
+            }
+            .switch {
+                position: relative;
+                display: inline-block;
+                width: 50px;
+                height: 26px;
+            }
+            .switch input {
+                opacity: 0;
+                width: 0;
+                height: 0;
+            }
+            .slider {
+                position: absolute;
+                cursor: pointer;
+                top: 0;
+                left: 0;
+                right: 0;
+                bottom: 0;
+                background-color: #cbd5e1;
+                transition: 0.4s;
+                border-radius: 34px;
+            }
+            .slider:before {
+                position: absolute;
+                content: "";
+                height: 18px;
+                width: 18px;
+                left: 4px;
+                bottom: 4px;
+                background-color: white;
+                transition: 0.4s;
+                border-radius: 50%;
+            }
+            input:checked + .slider {
+                background-color: #3b82f6;
+            }
+            input:checked + .slider:before {
+                transform: translateX(24px);
+            }
+            .lang-label {
+                cursor: pointer;
+                user-select: none;
+            }
+            .lang-label.active {
+                color: #0f172a;
+            }
 
-    <div id="content-en">
-      <p>This document is a comprehensive guide for developers or designers who wish to integrate JSON files exported from the Visual VN Editor, customize the renderer, improve UX, or build a production pipeline.</p>
+            /* Utility for hiding sections */
+            .hidden {
+                display: none !important;
+            }
+        </style>
+        <link
+            rel="stylesheet"
+            href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/styles/atom-one-dark.min.css"
+        />
+    </head>
+    <body>
+        <div class="wrap">
+            <div class="header-row">
+                <h1 id="doc-title">DocumentVisual VN Editor</h1>
 
-      <h2>Table of Contents (Brief)</h2>
-      <ol>
-        <li>Overview and File Structure</li>
-        <li>JSON Structure (Schema) - Key explanations</li>
-        <li>Full JSON Example with Field Descriptions</li>
-        <li>Rendering Pipeline (How to map data to visual elements)</li>
-        <li>Code Example (JavaScript) - Loader + Renderer</li>
-        <li>Image Management & Optimization</li>
-        <li>NodeGraphV2 System and Frame Mapping</li>
-        <li>Choices and Branching Support</li>
-        <li>UX Guidelines for Editor and Runtime</li>
-        <li>Real-world Integration - Patterns, Issues, and Debugging</li>
-        <li>Validation, Testing, and Versioning</li>
-      </ol>
+                <div class="switch-container">
+                    <span
+                        class="lang-label active"
+                        id="label-en"
+                        onclick="setLang('en')"
+                        >EN</span
+                    >
+                    <label class="switch">
+                        <input type="checkbox" id="langToggle" />
+                        <span class="slider"></span>
+                    </label>
+                    <span
+                        class="lang-label"
+                        id="label-th"
+                        onclick="setLang('th')"
+                        >TH</span
+                    >
+                </div>
+            </div>
 
-      <h2>1 - Overview and File Structure</h2>
-      <p>The main project consists of the following key files:</p>
-      <ul>
-        <li><strong>index.html</strong> - The editor's UI shell.</li>
-        <li><strong>style.css</strong> - All styles.</li>
-        <li><strong>main.js</strong> - Project model, editor actions, import/export, editor renderers.</li>
-        <li><strong>preview.js</strong> - Runtime preview (typewriter effect, slot rendering).</li>
-        <li><strong>ui-overrides.js</strong> - Helper UI (toast, modals, loading) and utilities.</li>
-        <li><strong>node-graph-v2.js</strong> - Storyline editor (nodes & links).</li>
-      </ul>
+            <div id="content-en">
+                <p>
+                    This document is a comprehensive guide for developers or
+                    designers who wish to integrate JSON files exported from the
+                    Visual VN Editor, customize the renderer, improve UX, or
+                    build a production pipeline.
+                </p>
 
-      <div class="note">Key takeaway: The main export file is a JSON containing `assets`, `characters`, and `chapters` keys. This is what you will use for integration.</div>
+                <h2>Table of Contents (Brief)</h2>
+                <ol>
+                    <li>Overview and File Structure</li>
+                    <li>JSON Structure (Schema) - Key explanations</li>
+                    <li>Full JSON Example with Field Descriptions</li>
+                    <li>
+                        Rendering Pipeline (How to map data to visual elements)
+                    </li>
+                    <li>Code Example (JavaScript) - Loader + Renderer</li>
+                    <li>Image Management & Optimization</li>
+                    <li>NodeGraphV2 System and Frame Mapping</li>
+                    <li>Choices and Branching Support</li>
+                    <li>UX Guidelines for Editor and Runtime</li>
+                    <li>
+                        Real-world Integration - Patterns, Issues, and Debugging
+                    </li>
+                    <li>Validation, Testing, and Versioning</li>
+                </ol>
 
-      <h2>2 - JSON Structure (Schema)</h2>
-      <p>Structure Overview:</p>
-      <pre>{
+                <h2>1 - Overview and File Structure</h2>
+                <p>The main project consists of the following key files:</p>
+                <ul>
+                    <li>
+                        <strong>index.html</strong> - The editor's UI shell.
+                    </li>
+                    <li><strong>style.css</strong> - All styles.</li>
+                    <li>
+                        <strong>main.js</strong> - Project model, editor
+                        actions, import/export, editor renderers.
+                    </li>
+                    <li>
+                        <strong>preview.js</strong> - Runtime preview
+                        (typewriter effect, slot rendering).
+                    </li>
+                    <li>
+                        <strong>ui-overrides.js</strong> - Helper UI (toast,
+                        modals, loading) and utilities.
+                    </li>
+                    <li>
+                        <strong>node-graph-v2.js</strong> - Storyline editor
+                        (nodes & links).
+                    </li>
+                </ul>
+
+                <div class="note">
+                    Key takeaway: The main export file is a JSON containing
+                    `assets`, `characters`, and `chapters` keys. This is what
+                    you will use for integration.
+                </div>
+
+                <h2>2 - JSON Structure (Schema)</h2>
+                <p>Structure Overview:</p>
+                <pre>
+{
   "assets": { "backgrounds": [ {"name":"bg-name","url":"data:image/...,","fileName":"..."}, ... ] },
   "characters": [ { "id":"c1","name":"Hiro","color":"#60a5fa","bodies":[...],"faces":[...] }, ... ],
   "chapters": [ { "id":1,"title":"Episode 1","frames":[ ... ], "graphV2": {...} }, ... ]
-}</pre>
+}</pre
+                >
 
-      <h3>Key Keys Explanation</h3>
-      <ul>
-        <li><strong>assets.backgrounds</strong>: List of backgrounds. Each object has <code>name</code>, <code>url</code> (data URL or external URL), and <code>fileName</code> (optional).</li>
-        <li><strong>characters</strong>: List of characters. Each has <code>id</code> (string), <code>name</code>, <code>color</code> (placeholder color), <code>bodies</code> (outfits/poses), and <code>faces</code> (expressions/emotions).</li>
-        <li><strong>chapters</strong>: Each chapter has an <code>id</code>, <code>title</code>, <code>frames</code> (array of frames), and an optional <code>graphV2</code> object storing node/link data.</li>
-        <li><strong>frames</strong> (inside chapter): Frame objects, for example:
-          <pre>{
+                <h3>Key Keys Explanation</h3>
+                <ul>
+                    <li>
+                        <strong>assets.backgrounds</strong>: List of
+                        backgrounds. Each object has <code>name</code>,
+                        <code>url</code> (data URL or external URL), and
+                        <code>fileName</code> (optional).
+                    </li>
+                    <li>
+                        <strong>characters</strong>: List of characters. Each
+                        has <code>id</code> (string), <code>name</code>,
+                        <code>color</code> (placeholder color),
+                        <code>bodies</code> (outfits/poses), and
+                        <code>faces</code> (expressions/emotions).
+                    </li>
+                    <li>
+                        <strong>chapters</strong>: Each chapter has an
+                        <code>id</code>, <code>title</code>,
+                        <code>frames</code> (array of frames), and an optional
+                        <code>graphV2</code> object storing node/link data.
+                    </li>
+                    <li>
+                        <strong>frames</strong> (inside chapter): Frame objects,
+                        for example:
+                        <pre>
+{
   "id":100,
   "text":"Hello world",
   "speakerId":"c1",
@@ -206,13 +286,15 @@
   "slots":[{ "charId":"c1","body":"uniform","face":"smile","x":0,"y":0,"scale":1,"mirror":false,"zIndex":1 }, null, ...],
   "attributes":{ "next":200 },
   "choices":[ {"text":"Go","type":"jump","target":300}, ... ]
-}</pre>
-        </li>
-      </ul>
+}</pre
+                        >
+                    </li>
+                </ul>
 
-      <h2>3 - Full JSON Example (Abbreviated)</h2>
-      <p>A complete frame example:</p>
-      <pre>{
+                <h2>3 - Full JSON Example (Abbreviated)</h2>
+                <p>A complete frame example:</p>
+                <pre>
+{
   "id":123,
   "text":"Hello {playerName}, welcome to the demo.",
   "speakerId":"c2",
@@ -225,31 +307,76 @@
   "frameType":"main",
   "choices":[],
   "returnToFrame":null
-}</pre>
+}</pre
+                >
 
-      <p>Deep dive into important fields:</p>
-      <ul>
-        <li><code>text</code>: May contain curly braces like <code>{playerName}</code> - the renderer should support token replacement.</li>
-        <li><code>slots</code>: An array of 4 slots (positions). Each slot is either <code>null</code> or an object defining the character and its rendering properties.</li>
-        <li><code>attributes.next</code>: The ID of the next frame (used for linear progression or instant frames).</li>
-        <li><code>choices</code>: If not empty, render choice buttons and follow the type (<code>jump</code> > go to target ID, <code>exec</code> > run specified JavaScript code).</li>
-      </ul>
+                <p>Deep dive into important fields:</p>
+                <ul>
+                    <li>
+                        <code>text</code>: May contain curly braces like
+                        <code>{playerName}</code> - the renderer should support
+                        token replacement.
+                    </li>
+                    <li>
+                        <code>slots</code>: An array of 4 slots (positions).
+                        Each slot is either <code>null</code> or an object
+                        defining the character and its rendering properties.
+                    </li>
+                    <li>
+                        <code>attributes.next</code>: The ID of the next frame
+                        (used for linear progression or instant frames).
+                    </li>
+                    <li>
+                        <code>choices</code>: If not empty, render choice
+                        buttons and follow the type (<code>jump</code> > go to
+                        target ID, <code>exec</code> > run specified JavaScript
+                        code).
+                    </li>
+                </ul>
 
-      <h2>4 - Rendering Pipeline</h2>
-      <p>Recommended flow for a renderer (web or native):</p>
-      <ol>
-        <li>Load JSON and Validate Schema: Check for the presence of <code>chapters</code>, <code>frames</code>, <code>characters</code>.</li>
-        <li>Prepare Asset Map: Create a map from background name > URL, and charId > character object.</li>
-        <li>Select Frame to Render (by index or ID) and perform token replacement on <code>text</code>.</li>
-        <li>Set Background: If URL is empty, use a color/placeholder.</li>
-        <li>Loop through each slot (0..3): If the slot has a character, create DOM/CANVAS element, load body/face images (use caching), apply transform: translate(x,y) scale(scale), and flip if mirrored.</li>
-        <li>Adjust Z-Index according to the slot's <code>zIndex</code>.</li>
-        <li>If <code>choices</code> exist, render buttons and attach event handlers.</li>
-        <li>Support Transitions/Animations: Play entry animations if present (e.g., slide_left/slide_right/fade).</li>
-      </ol>
+                <h2>4 - Rendering Pipeline</h2>
+                <p>Recommended flow for a renderer (web or native):</p>
+                <ol>
+                    <li>
+                        Load JSON and Validate Schema: Check for the presence of
+                        <code>chapters</code>, <code>frames</code>,
+                        <code>characters</code>.
+                    </li>
+                    <li>
+                        Prepare Asset Map: Create a map from background name >
+                        URL, and charId > character object.
+                    </li>
+                    <li>
+                        Select Frame to Render (by index or ID) and perform
+                        token replacement on <code>text</code>.
+                    </li>
+                    <li>
+                        Set Background: If URL is empty, use a
+                        color/placeholder.
+                    </li>
+                    <li>
+                        Loop through each slot (0..3): If the slot has a
+                        character, create DOM/CANVAS element, load body/face
+                        images (use caching), apply transform: translate(x,y)
+                        scale(scale), and flip if mirrored.
+                    </li>
+                    <li>
+                        Adjust Z-Index according to the slot's
+                        <code>zIndex</code>.
+                    </li>
+                    <li>
+                        If <code>choices</code> exist, render buttons and attach
+                        event handlers.
+                    </li>
+                    <li>
+                        Support Transitions/Animations: Play entry animations if
+                        present (e.g., slide_left/slide_right/fade).
+                    </li>
+                </ol>
 
-      <h2>5 - Code Example: Loader + Renderer (JavaScript)</h2>
-      <pre>// Simplified loader + renderer example
+                <h2>5 - Code Example: Loader + Renderer (JavaScript)</h2>
+                <pre>
+// Simplified loader + renderer example
 async function loadProject(json) {
   const project = JSON.parse(json);
   const bgMap = new Map(project.assets.backgrounds.map(b=>[b.name,b.url]));
@@ -262,7 +389,7 @@ function renderFrame(frame, maps) {
   const vp = document.getElementById('viewport');
   vp.style.backgroundImage = frame.background ? `url(${bgMap.get(frame.background)})` : 'none';
   const textEl = document.getElementById('dialog');
-  
+
   // token replacement example
   textEl.textContent = frame.text.replace(/\{([^}]+)\}/g,(m,k)=>{/* provide tokens */ return '...';});
 
@@ -279,76 +406,175 @@ function renderFrame(frame, maps) {
     slotEl.appendChild(img);
   }
 }
-      </pre>
+      </pre
+                >
 
-      <h2>6 - Image Management & Optimization</h2>
-      <p>Key points:</p>
-      <ul>
-        <li>Images inside the JSON are mostly data URLs. This is convenient but increases file size. Consider separating files for production.</li>
-        <li>Use client-side optimization before export - see the <code>optimizeProjectImages()</code> function in <code>main.js</code> which compresses images.</li>
-        <li>Cache loaded images (in-memory) to reduce repeated decoding.</li>
-        <li>For mobile: Reduce base image size, use <code>srcset</code>, or load low-res versions first.</li>
-      </ul>
+                <h2>6 - Image Management & Optimization</h2>
+                <p>Key points:</p>
+                <ul>
+                    <li>
+                        Images inside the JSON are mostly data URLs. This is
+                        convenient but increases file size. Consider separating
+                        files for production.
+                    </li>
+                    <li>
+                        Use client-side optimization before export - see the
+                        <code>optimizeProjectImages()</code> function in
+                        <code>main.js</code> which compresses images.
+                    </li>
+                    <li>
+                        Cache loaded images (in-memory) to reduce repeated
+                        decoding.
+                    </li>
+                    <li>
+                        For mobile: Reduce base image size, use
+                        <code>srcset</code>, or load low-res versions first.
+                    </li>
+                </ul>
 
-      <h2>7 - NodeGraphV2 and Frame Mapping</h2>
-      <p>Chapters may contain a <code>graphV2</code> key which stores nodes/lists/links of the storyline. Benefits include:</p>
-      <ul>
-        <li>Define special <code>start</code> and <code>end</code> nodes to verify story completeness.</li>
-        <li>Links connecting node ports can be converted to <code>attributes.next</code> or choice targets in frames.</li>
-        <li>When exporting for runtime: Use <code>applyGraphLinksToFrames()</code> to automatically write values into frames.</li>
-      </ul>
+                <h2>7 - NodeGraphV2 and Frame Mapping</h2>
+                <p>
+                    Chapters may contain a <code>graphV2</code> key which stores
+                    nodes/lists/links of the storyline. Benefits include:
+                </p>
+                <ul>
+                    <li>
+                        Define special <code>start</code> and
+                        <code>end</code> nodes to verify story completeness.
+                    </li>
+                    <li>
+                        Links connecting node ports can be converted to
+                        <code>attributes.next</code> or choice targets in
+                        frames.
+                    </li>
+                    <li>
+                        When exporting for runtime: Use
+                        <code>applyGraphLinksToFrames()</code> to automatically
+                        write values into frames.
+                    </li>
+                </ul>
 
-      <h2>8 - Choices & Branching Support</h2>
-      <p>Best practices for choices:</p>
-      <ol>
-        <li>Display buttons for all choices in the order stored in the array.</li>
-        <li>Choice types:
-          <ul>
-            <li><code>jump</code> - Navigate to the target frame ID.</li>
-            <li><code>exec</code> - Run JavaScript code (Warning: Security risk. Do not run directly if data is untrusted).</li>
-          </ul>
-        </li>
-        <li>When a user makes a selection, record a save point if undo/redo is required.</li>
-      </ol>
+                <h2>8 - Choices & Branching Support</h2>
+                <p>Best practices for choices:</p>
+                <ol>
+                    <li>
+                        Display buttons for all choices in the order stored in
+                        the array.
+                    </li>
+                    <li>
+                        Choice types:
+                        <ul>
+                            <li>
+                                <code>jump</code> - Navigate to the target frame
+                                ID.
+                            </li>
+                            <li>
+                                <code>exec</code> - Run JavaScript code
+                                (Warning: Security risk. Do not run directly if
+                                data is untrusted).
+                            </li>
+                        </ul>
+                    </li>
+                    <li>
+                        When a user makes a selection, record a save point if
+                        undo/redo is required.
+                    </li>
+                </ol>
 
-      <h2>9 - UX Guidelines (Editor & Runtime)</h2>
-      <p>Important recommendations for both editor and runtime UX:</p>
-      <ol>
-        <li>Visible Stage: Changes should be immediately visible when placing characters. Drag & drop should have visual affordance (highlight, ghost preview).</li>
-        <li>Slot Property Editing: Controls for (x, y, scale, mirror, zIndex) should be inline in the inspector with real-time preview.</li>
-        <li>Snap-to-grid and Fine-grain Adjustments: Support keyboard nudging for precision.</li>
-        <li>Auto-save: Implement auto-backup with a visual indicator upon success.</li>
-        <li>Runtime: Choices should be clear. Scene changes should have configurable transitions.</li>
-        <li>Accessibility: High contrast, readable font sizes, keyboard navigation for choices.</li>
-      </ol>
+                <h2>9 - UX Guidelines (Editor & Runtime)</h2>
+                <p>Important recommendations for both editor and runtime UX:</p>
+                <ol>
+                    <li>
+                        Visible Stage: Changes should be immediately visible
+                        when placing characters. Drag & drop should have visual
+                        affordance (highlight, ghost preview).
+                    </li>
+                    <li>
+                        Slot Property Editing: Controls for (x, y, scale,
+                        mirror, zIndex) should be inline in the inspector with
+                        real-time preview.
+                    </li>
+                    <li>
+                        Snap-to-grid and Fine-grain Adjustments: Support
+                        keyboard nudging for precision.
+                    </li>
+                    <li>
+                        Auto-save: Implement auto-backup with a visual indicator
+                        upon success.
+                    </li>
+                    <li>
+                        Runtime: Choices should be clear. Scene changes should
+                        have configurable transitions.
+                    </li>
+                    <li>
+                        Accessibility: High contrast, readable font sizes,
+                        keyboard navigation for choices.
+                    </li>
+                </ol>
 
-      <h2>10 - Integration Patterns & Usage Examples</h2>
-      <p>Examples of using the JSON:</p>
-      <ul>
-        <li>Embed preview in game UI: Load JSON on the server, then client fetches & renders using your renderer.</li>
-        <li>Export assets for native build: Extract data URLs into real files, then replace URLs in the JSON with new paths.</li>
-        <li>Streaming: For large projects, load metadata first, then lazy-load images on-demand.</li>
-        <li>Save checkpoints: When the user passes each main frame, POST the checkpoint to the backend.</li>
-      </ul>
+                <h2>10 - Integration Patterns & Usage Examples</h2>
+                <p>Examples of using the JSON:</p>
+                <ul>
+                    <li>
+                        Embed preview in game UI: Load JSON on the server, then
+                        client fetches & renders using your renderer.
+                    </li>
+                    <li>
+                        Export assets for native build: Extract data URLs into
+                        real files, then replace URLs in the JSON with new
+                        paths.
+                    </li>
+                    <li>
+                        Streaming: For large projects, load metadata first, then
+                        lazy-load images on-demand.
+                    </li>
+                    <li>
+                        Save checkpoints: When the user passes each main frame,
+                        POST the checkpoint to the backend.
+                    </li>
+                </ul>
 
-      <h2>11 - Validation, Testing, and Versioning</h2>
-      <p>Recommendations:</p>
-      <ul>
-        <li>Write a JSON Schema to validate project structure before loading.</li>
-        <li>Unit tests for graphV2 -> frames conversion, token replacement, and choice parsing.</li>
-        <li>Store version numbers in the JSON file and handle migration functions when the structure changes.</li>
-      </ul>
+                <h2>11 - Validation, Testing, and Versioning</h2>
+                <p>Recommendations:</p>
+                <ul>
+                    <li>
+                        Write a JSON Schema to validate project structure before
+                        loading.
+                    </li>
+                    <li>
+                        Unit tests for graphV2 -> frames conversion, token
+                        replacement, and choice parsing.
+                    </li>
+                    <li>
+                        Store version numbers in the JSON file and handle
+                        migration functions when the structure changes.
+                    </li>
+                </ul>
 
-      <h2>12 - Troubleshooting & Cautions</h2>
-      <ul>
-        <li>"showToast is not defined" error: Check script loading order. Ensure `ui-overrides.js` loads before `main.js`.</li>
-        <li>Images not showing: Check if the URL is a valid data:image or accessible external URL, and check browser console errors.</li>
-        <li>Performance issues: Use profiling to check for redundant image decoding or excessive DOM updates.</li>
-        <li>Security: Avoid running code from `choices.exec` if the file comes from an untrusted source.</li>
-      </ul>
+                <h2>12 - Troubleshooting & Cautions</h2>
+                <ul>
+                    <li>
+                        "showToast is not defined" error: Check script loading
+                        order. Ensure `ui-overrides.js` loads before `main.js`.
+                    </li>
+                    <li>
+                        Images not showing: Check if the URL is a valid
+                        data:image or accessible external URL, and check browser
+                        console errors.
+                    </li>
+                    <li>
+                        Performance issues: Use profiling to check for redundant
+                        image decoding or excessive DOM updates.
+                    </li>
+                    <li>
+                        Security: Avoid running code from `choices.exec` if the
+                        file comes from an untrusted source.
+                    </li>
+                </ul>
 
-      <h2>Appendix - Small JSON Example for Testing</h2>
-      <pre>{
+                <h2>Appendix - Small JSON Example for Testing</h2>
+                <pre>
+{
   "assets": { "backgrounds": [ {"name":"none","url":null} ] },
   "characters": [
     {"id":"c1","name":"Hiro","color":"#60a5fa","bodies":[{"name":"default","url":null}],"faces":[{"name":"smile","x":50,"y":20,"scale":1,"url":null}]}
@@ -359,57 +585,115 @@ function renderFrame(frame, maps) {
       {"id":101,"text":"The End","speakerId":"c1","background":"none","slots":[{"charId":"c1","body":"default","face":"smile","x":0,"y":0,"scale":1,"mirror":false}],"attributes":{}}
     ]
   }]
-}</pre>
+}</pre
+                >
 
-      <footer class="note">If needed, I can convert this renderer example into a reusable module, add a JSON Schema for validation, or build a production pipeline example (extracting images, static asset server) - just let me know.</footer>
-    </div>
+                <footer class="note">
+                    If needed, I can convert this renderer example into a
+                    reusable module, add a JSON Schema for validation, or build
+                    a production pipeline example (extracting images, static
+                    asset server) - just let me know.
+                </footer>
+            </div>
 
-    <div id="content-th" class="hidden">
-      <p>เอกสารฉบับนี้เป็นคู่มือที่ละเอียดและครบถ้วนสำหรับผู้พัฒนาหรือนักออกแบบที่ต้องการนำไฟล์ JSON ที่ส่งออกจาก Visual VN Editor ไปใช้งานต่อ (integration), ปรับแต่ง renderer, ปรับปรุง UX หรือสร้าง production pipeline</p>
+            <div id="content-th" class="hidden">
+                <p>
+                    เอกสารฉบับนี้เป็นคู่มือที่ละเอียดและครบถ้วนสำหรับผู้พัฒนาหรือนักออกแบบที่ต้องการนำไฟล์
+                    JSON ที่ส่งออกจาก Visual VN Editor ไปใช้งานต่อ
+                    (integration), ปรับแต่ง renderer, ปรับปรุง UX หรือสร้าง
+                    production pipeline
+                </p>
 
-      <h2>สารบัญ (อย่างย่อ)</h2>
-      <ol>
-        <li>ภาพรวมและโครงสร้างไฟล์</li>
-        <li>โครงสร้าง JSON (schema) - อธิบายแต่ละคีย์</li>
-        <li>ตัวอย่าง JSON ฉบับเต็มและอธิบายฟิลด์</li>
-        <li>วิธีการอ่านและแมปข้อมูลไปเป็นองค์ประกอบบนหน้า (rendering pipeline)</li>
-        <li>ตัวอย่างโค้ดการแสดงผล (JavaScript) - loader + renderer</li>
-        <li>การจัดการภาพและการเพิ่มประสิทธิภาพ (optimization)</li>
-        <li>ระบบโหนด (NodeGraphV2) และการใช้ graphV2 กับเฟรม</li>
-        <li>รองรับทางเลือก (choices) และการเปลี่ยนเส้นทาง (branching)</li>
-        <li>UX / ชุดแนวทางการออกแบบสำหรับ editor และ runtime</li>
-        <li>การนำไปใช้จริง - ตัวอย่าง integration, ปัญหาทั่วไป และการดีบัก</li>
-        <li>การทดสอบ / validation และเวอร์ชันนิ่ง</li>
-      </ol>
+                <h2>สารบัญ (อย่างย่อ)</h2>
+                <ol>
+                    <li>ภาพรวมและโครงสร้างไฟล์</li>
+                    <li>โครงสร้าง JSON (schema) - อธิบายแต่ละคีย์</li>
+                    <li>ตัวอย่าง JSON ฉบับเต็มและอธิบายฟิลด์</li>
+                    <li>
+                        วิธีการอ่านและแมปข้อมูลไปเป็นองค์ประกอบบนหน้า (rendering
+                        pipeline)
+                    </li>
+                    <li>
+                        ตัวอย่างโค้ดการแสดงผล (JavaScript) - loader + renderer
+                    </li>
+                    <li>การจัดการภาพและการเพิ่มประสิทธิภาพ (optimization)</li>
+                    <li>ระบบโหนด (NodeGraphV2) และการใช้ graphV2 กับเฟรม</li>
+                    <li>
+                        รองรับทางเลือก (choices) และการเปลี่ยนเส้นทาง
+                        (branching)
+                    </li>
+                    <li>UX / ชุดแนวทางการออกแบบสำหรับ editor และ runtime</li>
+                    <li>
+                        การนำไปใช้จริง - ตัวอย่าง integration, ปัญหาทั่วไป
+                        และการดีบัก
+                    </li>
+                    <li>การทดสอบ / validation และเวอร์ชันนิ่ง</li>
+                </ol>
 
-      <h2>1 - ภาพรวมและโครงสร้างไฟล์</h2>
-      <p>โปรเจกต์หลักประกอบด้วยไฟล์สำคัญดังนี้:</p>
-      <ul>
-        <li><strong>index.html</strong> - UI shell ของ editor</li>
-        <li><strong>style.css</strong> - สไตล์ทั้งหมด</li>
-        <li><strong>main.js</strong> - โมเดลโปรเจกต์, editor actions, import/export, renderers ของส่วน editor</li>
-        <li><strong>preview.js</strong> - runtime preview (typewriter, slot rendering)</li>
-        <li><strong>ui-overrides.js</strong> - helper UI (toast, modals, loading) และ utilities</li>
-        <li><strong>node-graph-v2.js</strong> - storyline editor (nodes & links)</li>
-      </ul>
+                <h2>1 - ภาพรวมและโครงสร้างไฟล์</h2>
+                <p>โปรเจกต์หลักประกอบด้วยไฟล์สำคัญดังนี้:</p>
+                <ul>
+                    <li><strong>index.html</strong> - UI shell ของ editor</li>
+                    <li><strong>style.css</strong> - สไตล์ทั้งหมด</li>
+                    <li>
+                        <strong>main.js</strong> - โมเดลโปรเจกต์, editor
+                        actions, import/export, renderers ของส่วน editor
+                    </li>
+                    <li>
+                        <strong>preview.js</strong> - runtime preview
+                        (typewriter, slot rendering)
+                    </li>
+                    <li>
+                        <strong>ui-overrides.js</strong> - helper UI (toast,
+                        modals, loading) และ utilities
+                    </li>
+                    <li>
+                        <strong>node-graph-v2.js</strong> - storyline editor
+                        (nodes & links)
+                    </li>
+                </ul>
 
-      <div class="note">คำสำคัญ: ไฟล์ที่ส่งออกหลักจะเป็น JSON ที่มีคีย์ `assets`, `characters`, `chapters` - นี่คือสิ่งที่จะนำไปใช้งานต่อ</div>
+                <div class="note">
+                    คำสำคัญ: ไฟล์ที่ส่งออกหลักจะเป็น JSON ที่มีคีย์ `assets`,
+                    `characters`, `chapters` - นี่คือสิ่งที่จะนำไปใช้งานต่อ
+                </div>
 
-      <h2>2 - โครงสร้าง JSON (schema) อธิบายตามคีย์</h2>
-      <p>ภาพรวมโครงสร้าง:</p>
-      <pre>{
+                <h2>2 - โครงสร้าง JSON (schema) อธิบายตามคีย์</h2>
+                <p>ภาพรวมโครงสร้าง:</p>
+                <pre>
+{
   "assets": { "backgrounds": [ {"name":"bg-name","url":"data:image/...,","fileName":"..."}, ... ] },
   "characters": [ { "id":"c1","name":"Hiro","color":"#60a5fa","bodies":[...],"faces":[...] }, ... ],
   "chapters": [ { "id":1,"title":"Episode 1","frames":[ ... ], "graphV2": {...} }, ... ]
-}</pre>
+}</pre
+                >
 
-      <h3>อธิบายคีย์สำคัญ</h3>
-      <ul>
-        <li><strong>assets.backgrounds</strong>: รายการภูมิหลัง (background) แต่ละออบเจ็กต์มี <code>name</code>, <code>url</code> (data URL หรือ external URL), <code>fileName</code> (optional)</li>
-        <li><strong>characters</strong>: รายการตัวละคร แต่ละตัวมี <code>id</code> (string), <code>name</code>, <code>color</code> (placeholder color), <code>bodies</code> (ชุดร่าง/ชุดเสื้อผ้า), <code>faces</code> (ใบหน้า/อีโมชัน)</li>
-        <li><strong>chapters</strong>: แต่ละบทมี <code>id</code>, <code>title</code>, <code>frames</code> (อาร์เรย์ของเฟรม), และอ็อบชัน <code>graphV2</code> ที่เก็บข้อมูลโหนด/ลิงก์</li>
-        <li><strong>frames</strong> (ภายใน chapter): ออบเจ็กต์เฟรม เช่น:
-          <pre>{
+                <h3>อธิบายคีย์สำคัญ</h3>
+                <ul>
+                    <li>
+                        <strong>assets.backgrounds</strong>: รายการภูมิหลัง
+                        (background) แต่ละออบเจ็กต์มี <code>name</code>,
+                        <code>url</code> (data URL หรือ external URL),
+                        <code>fileName</code> (optional)
+                    </li>
+                    <li>
+                        <strong>characters</strong>: รายการตัวละคร แต่ละตัวมี
+                        <code>id</code> (string), <code>name</code>,
+                        <code>color</code> (placeholder color),
+                        <code>bodies</code> (ชุดร่าง/ชุดเสื้อผ้า),
+                        <code>faces</code> (ใบหน้า/อีโมชัน)
+                    </li>
+                    <li>
+                        <strong>chapters</strong>: แต่ละบทมี <code>id</code>,
+                        <code>title</code>,
+                        <code>frames</code> (อาร์เรย์ของเฟรม), และอ็อบชัน
+                        <code>graphV2</code> ที่เก็บข้อมูลโหนด/ลิงก์
+                    </li>
+                    <li>
+                        <strong>frames</strong> (ภายใน chapter): ออบเจ็กต์เฟรม
+                        เช่น:
+                        <pre>
+{
   "id":100,
   "text":"Hello world",
   "speakerId":"c1",
@@ -417,13 +701,15 @@ function renderFrame(frame, maps) {
   "slots":[{ "charId":"c1","body":"uniform","face":"smile","x":0,"y":0,"scale":1,"mirror":false,"zIndex":1 }, null, ...],
   "attributes":{ "next":200 },
   "choices":[ {"text":"Go","type":"jump","target":300}, ... ]
-}</pre>
-        </li>
-      </ul>
+}</pre
+                        >
+                    </li>
+                </ul>
 
-      <h2>3 - ตัวอย่าง JSON ฉบับเต็ม (ย่อ) และคำอธิบาย</h2>
-      <p>ตัวอย่างเฟรมแบบสมบูรณ์:</p>
-      <pre>{
+                <h2>3 - ตัวอย่าง JSON ฉบับเต็ม (ย่อ) และคำอธิบาย</h2>
+                <p>ตัวอย่างเฟรมแบบสมบูรณ์:</p>
+                <pre>
+{
   "id":123,
   "text":"Hello {playerName}, welcome to the demo.",
   "speakerId":"c2",
@@ -436,31 +722,70 @@ function renderFrame(frame, maps) {
   "frameType":"main",
   "choices":[],
   "returnToFrame":null
-}</pre>
+}</pre
+                >
 
-      <p>คำอธิบายเชิงลึกฟิลด์ที่สำคัญ:</p>
-      <ul>
-        <li><code>text</code>: อาจมีเครื่องหมายวงเล็บปีกกา เช่น <code>{playerName}</code> - renderer ควรรองรับ token replacement</li>
-        <li><code>slots</code>: อาร์เรย์ 4 ช่อง (ตำแหน่ง) แต่ละช่องเป็น <code>null</code> หรือ object ที่ระบุตัวละครและการแสดงผล</li>
-        <li><code>attributes.next</code>: ค่า id ของเฟรมถัดไป (ใช้สำหรับการเดินเรื่องแบบ linear หรือ instant frames)</li>
-        <li><code>choices</code>: ถ้าไม่ว่าง ให้แสดงปุ่มตัวเลือกและทำตามประเภท (<code>jump</code> > ไปยัง id เป้าหมาย, <code>exec</code> > รันโค้ด JavaScript ที่ระบุ)</li>
-      </ul>
+                <p>คำอธิบายเชิงลึกฟิลด์ที่สำคัญ:</p>
+                <ul>
+                    <li>
+                        <code>text</code>: อาจมีเครื่องหมายวงเล็บปีกกา เช่น
+                        <code>{playerName}</code> - renderer ควรรองรับ token
+                        replacement
+                    </li>
+                    <li>
+                        <code>slots</code>: อาร์เรย์ 4 ช่อง (ตำแหน่ง)
+                        แต่ละช่องเป็น <code>null</code> หรือ object
+                        ที่ระบุตัวละครและการแสดงผล
+                    </li>
+                    <li>
+                        <code>attributes.next</code>: ค่า id ของเฟรมถัดไป
+                        (ใช้สำหรับการเดินเรื่องแบบ linear หรือ instant frames)
+                    </li>
+                    <li>
+                        <code>choices</code>: ถ้าไม่ว่าง
+                        ให้แสดงปุ่มตัวเลือกและทำตามประเภท (<code>jump</code> >
+                        ไปยัง id เป้าหมาย, <code>exec</code> > รันโค้ด
+                        JavaScript ที่ระบุ)
+                    </li>
+                </ul>
 
-      <h2>4 - Rendering pipeline (ขั้นตอนการแสดงผลแบบเป็นระบบ)</h2>
-      <p>แนะนำ flow สำหรับ renderer (web หรือ native):</p>
-      <ol>
-        <li>โหลด JSON และตรวจสอบ schema (validate): ตรวจสอบ presence ของ <code>chapters</code>, <code>frames</code>, <code>characters</code></li>
-        <li>เตรียม asset map: สร้าง map จากชื่อ background > URL, charId > character object</li>
-        <li>เลือกเฟรมที่จะเรนเดอร์ (index หรือ id) และทำ token replacement ใน <code>text</code></li>
-        <li>ตั้ง background (ถ้า url ว่างให้ใช้สี/placeholder)</li>
-        <li>วนแต่ละ slot (0..3): ถ้า slot มีตัวละครให้สร้าง DOM/CANVAS element, โหลดรูป body/face (ใช้ caching), apply transform: translate(x,y) scale(scale) flip if mirror</li>
-        <li>ปรับ z-index ตาม <code>zIndex</code> ของ slot</li>
-        <li>ถ้ามี <code>choices</code> ให้เรนเดอร์ปุ่มและเชื่อม event handler</li>
-        <li>รองรับ transitions/animations: เล่น animation เริ่มต้นถ้ามี (เช่น slide_left/slide_right/fade)</li>
-      </ol>
+                <h2>4 - Rendering pipeline (ขั้นตอนการแสดงผลแบบเป็นระบบ)</h2>
+                <p>แนะนำ flow สำหรับ renderer (web หรือ native):</p>
+                <ol>
+                    <li>
+                        โหลด JSON และตรวจสอบ schema (validate): ตรวจสอบ presence
+                        ของ <code>chapters</code>, <code>frames</code>,
+                        <code>characters</code>
+                    </li>
+                    <li>
+                        เตรียม asset map: สร้าง map จากชื่อ background > URL,
+                        charId > character object
+                    </li>
+                    <li>
+                        เลือกเฟรมที่จะเรนเดอร์ (index หรือ id) และทำ token
+                        replacement ใน <code>text</code>
+                    </li>
+                    <li>ตั้ง background (ถ้า url ว่างให้ใช้สี/placeholder)</li>
+                    <li>
+                        วนแต่ละ slot (0..3): ถ้า slot มีตัวละครให้สร้าง
+                        DOM/CANVAS element, โหลดรูป body/face (ใช้ caching),
+                        apply transform: translate(x,y) scale(scale) flip if
+                        mirror
+                    </li>
+                    <li>ปรับ z-index ตาม <code>zIndex</code> ของ slot</li>
+                    <li>
+                        ถ้ามี <code>choices</code> ให้เรนเดอร์ปุ่มและเชื่อม
+                        event handler
+                    </li>
+                    <li>
+                        รองรับ transitions/animations: เล่น animation
+                        เริ่มต้นถ้ามี (เช่น slide_left/slide_right/fade)
+                    </li>
+                </ol>
 
-      <h2>5 - ตัวอย่างโค้ดการโหลด + แสดงผล (JavaScript, ต้นแบบ)</h2>
-      <pre>// ตัวอย่าง simplified loader + renderer
+                <h2>5 - ตัวอย่างโค้ดการโหลด + แสดงผล (JavaScript, ต้นแบบ)</h2>
+                <pre>
+// ตัวอย่าง simplified loader + renderer
 async function loadProject(json) {
   const project = JSON.parse(json);
   const bgMap = new Map(project.assets.backgrounds.map(b=>[b.name,b.url]));
@@ -489,76 +814,170 @@ function renderFrame(frame, maps) {
     slotEl.appendChild(img);
   }
 }
-      </pre>
+      </pre
+                >
 
-      <h2>6 - การจัดการภาพและการเพิ่มประสิทธิภาพ</h2>
-      <p>ประเด็นสำคัญ:</p>
-      <ul>
-        <li>ไฟล์ภาพภายใน JSON ส่วนใหญ่เป็น data URLs - สะดวกแต่ใหญ่ขึ้น ต้องพิจารณาแยกไฟล์สำหรับ production</li>
-        <li>ใช้ client-side optimization ก่อน export - มีฟังก์ชัน <code>optimizeProjectImages()</code> ใน <code>main.js</code> ที่ย่อภาพ</li>
-        <li>Cache รูปภาพที่ถูกโหลดแล้ว (in-memory) เพื่อลดการ decode ซ้ำ</li>
-        <li>สำหรับมือถือ: ลดขนาด base image, ใช้ <code>srcset</code> หรือโหลดเวอร์ชันความละเอียดต่ำก่อน</li>
-      </ul>
+                <h2>6 - การจัดการภาพและการเพิ่มประสิทธิภาพ</h2>
+                <p>ประเด็นสำคัญ:</p>
+                <ul>
+                    <li>
+                        ไฟล์ภาพภายใน JSON ส่วนใหญ่เป็น data URLs -
+                        สะดวกแต่ใหญ่ขึ้น ต้องพิจารณาแยกไฟล์สำหรับ production
+                    </li>
+                    <li>
+                        ใช้ client-side optimization ก่อน export - มีฟังก์ชัน
+                        <code>optimizeProjectImages()</code> ใน
+                        <code>main.js</code> ที่ย่อภาพ
+                    </li>
+                    <li>
+                        Cache รูปภาพที่ถูกโหลดแล้ว (in-memory) เพื่อลดการ decode
+                        ซ้ำ
+                    </li>
+                    <li>
+                        สำหรับมือถือ: ลดขนาด base image, ใช้
+                        <code>srcset</code> หรือโหลดเวอร์ชันความละเอียดต่ำก่อน
+                    </li>
+                </ul>
 
-      <h2>7 - NodeGraphV2 (graphV2) และการ map ไปยัง frames</h2>
-      <p>ภายใน chapter อาจมีคีย์ <code>graphV2</code> ซึ่งเก็บ node/list/links ของ storyline - โดยมีประโยชน์ดังนี้:</p>
-      <ul>
-        <li>กำหนด node พิเศษ <code>start</code> และ <code>end</code> เพื่อใช้ตรวจสอบความสมบูรณ์ของเรื่อง</li>
-        <li>ลิงก์เชื่อมพอร์ตของ node -> สามารถแปลงเป็น <code>attributes.next</code> หรือ choice targets ใน frame</li>
-        <li>เมื่อต้องการ export เป็น runtime format: ใช้ <code>applyGraphLinksToFrames()</code> เพื่อเขียนค่าสู่ frames อัตโนมัติ</li>
-      </ul>
+                <h2>7 - NodeGraphV2 (graphV2) และการ map ไปยัง frames</h2>
+                <p>
+                    ภายใน chapter อาจมีคีย์ <code>graphV2</code> ซึ่งเก็บ
+                    node/list/links ของ storyline - โดยมีประโยชน์ดังนี้:
+                </p>
+                <ul>
+                    <li>
+                        กำหนด node พิเศษ <code>start</code> และ
+                        <code>end</code> เพื่อใช้ตรวจสอบความสมบูรณ์ของเรื่อง
+                    </li>
+                    <li>
+                        ลิงก์เชื่อมพอร์ตของ node -> สามารถแปลงเป็น
+                        <code>attributes.next</code> หรือ choice targets ใน
+                        frame
+                    </li>
+                    <li>
+                        เมื่อต้องการ export เป็น runtime format: ใช้
+                        <code>applyGraphLinksToFrames()</code> เพื่อเขียนค่าสู่
+                        frames อัตโนมัติ
+                    </li>
+                </ul>
 
-      <h2>8 - Choices & Branching (แนะนำการรองรับ)</h2>
-      <p>แนวปฏิบัติเมื่อมีตัวเลือก:</p>
-      <ol>
-        <li>แสดงปุ่มทุกตัวเลือกในลำดับที่เก็บในอาร์เรย์</li>
-        <li>ประเภท choice:
-          <ul>
-            <li><code>jump</code> - ไปยัง id ของเฟรมเป้าหมาย</li>
-            <li><code>exec</code> - รันโค้ด JavaScript (ระวังความปลอดภัย หากข้อมูลจากผู้ใช้ไม่เชื่อถืออย่ารันโดยตรง)</li>
-          </ul>
-        </li>
-        <li>เมื่อผู้ใช้เลือก ให้บันทึกจุดเดินเรื่อง (save point) หากต้องการ undo/redo</li>
-      </ol>
+                <h2>8 - Choices & Branching (แนะนำการรองรับ)</h2>
+                <p>แนวปฏิบัติเมื่อมีตัวเลือก:</p>
+                <ol>
+                    <li>แสดงปุ่มทุกตัวเลือกในลำดับที่เก็บในอาร์เรย์</li>
+                    <li>
+                        ประเภท choice:
+                        <ul>
+                            <li>
+                                <code>jump</code> - ไปยัง id ของเฟรมเป้าหมาย
+                            </li>
+                            <li>
+                                <code>exec</code> - รันโค้ด JavaScript
+                                (ระวังความปลอดภัย
+                                หากข้อมูลจากผู้ใช้ไม่เชื่อถืออย่ารันโดยตรง)
+                            </li>
+                        </ul>
+                    </li>
+                    <li>
+                        เมื่อผู้ใช้เลือก ให้บันทึกจุดเดินเรื่อง (save point)
+                        หากต้องการ undo/redo
+                    </li>
+                </ol>
 
-      <h2>9 - UX Guidelines (Editor & Runtime)</h2>
-      <p>คำแนะนำสำคัญสำหรับ UX ทั้ง editor และ runtime:</p>
-      <ol>
-        <li>ให้พื้นที่ Stage ที่มองเห็นผลทันทีเมื่อวางตัวละคร - drag & drop ต้องมี visual affordance (highlight, ghost preview)</li>
-        <li>การแก้ไข properties ของ slot (x,y,scale,mirror,zIndex) ควรเป็น inline controls ใน inspector และมี real-time preview</li>
-        <li>รองรับ snap-to-grid และ fine-grain adjustments (keyboard nudge) เพื่อความแม่นยำ</li>
-        <li>ให้ระบบสำรองอัตโนมัติ (auto-save) และ visual indicator เมื่อสำเร็จ</li>
-        <li>ใน runtime: ให้ตัวเลือกแบบชัดเจน และหากมีการเปลี่ยนฉากให้มี transition แบบ configurable</li>
-        <li>รองรับ accessibility: contrast สูง, readable font sizes, keyboard navigation for choices</li>
-      </ol>
+                <h2>9 - UX Guidelines (Editor & Runtime)</h2>
+                <p>คำแนะนำสำคัญสำหรับ UX ทั้ง editor และ runtime:</p>
+                <ol>
+                    <li>
+                        ให้พื้นที่ Stage ที่มองเห็นผลทันทีเมื่อวางตัวละคร - drag
+                        & drop ต้องมี visual affordance (highlight, ghost
+                        preview)
+                    </li>
+                    <li>
+                        การแก้ไข properties ของ slot (x,y,scale,mirror,zIndex)
+                        ควรเป็น inline controls ใน inspector และมี real-time
+                        preview
+                    </li>
+                    <li>
+                        รองรับ snap-to-grid และ fine-grain adjustments (keyboard
+                        nudge) เพื่อความแม่นยำ
+                    </li>
+                    <li>
+                        ให้ระบบสำรองอัตโนมัติ (auto-save) และ visual indicator
+                        เมื่อสำเร็จ
+                    </li>
+                    <li>
+                        ใน runtime: ให้ตัวเลือกแบบชัดเจน
+                        และหากมีการเปลี่ยนฉากให้มี transition แบบ configurable
+                    </li>
+                    <li>
+                        รองรับ accessibility: contrast สูง, readable font sizes,
+                        keyboard navigation for choices
+                    </li>
+                </ol>
 
-      <h2>10 - Integration Patterns & ตัวอย่างการใช้งาน</h2>
-      <p>ตัวอย่างการนำ JSON ไปใช้:</p>
-      <ul>
-        <li>Embed preview in game UI: โหลด JSON บน server แล้ว client จะ fetch & render โดยใช้ renderer ของคุณ</li>
-        <li>Export assets for native build: แตก data URLs เป็นไฟล์จริง จากนั้นแทนที่ URLs ใน JSON ด้วย path ใหม่</li>
-        <li>Streaming: สำหรับโปรเจกต์ขนาดใหญ่ โหลด metadata ก่อน แล้ว lazy-load images on-demand</li>
-        <li>Save checkpoints: เมื่อ user ผ่านแต่ละ main frame ให้ POST checkpoint ไปยัง backend</li>
-      </ul>
+                <h2>10 - Integration Patterns & ตัวอย่างการใช้งาน</h2>
+                <p>ตัวอย่างการนำ JSON ไปใช้:</p>
+                <ul>
+                    <li>
+                        Embed preview in game UI: โหลด JSON บน server แล้ว
+                        client จะ fetch & render โดยใช้ renderer ของคุณ
+                    </li>
+                    <li>
+                        Export assets for native build: แตก data URLs
+                        เป็นไฟล์จริง จากนั้นแทนที่ URLs ใน JSON ด้วย path ใหม่
+                    </li>
+                    <li>
+                        Streaming: สำหรับโปรเจกต์ขนาดใหญ่ โหลด metadata ก่อน
+                        แล้ว lazy-load images on-demand
+                    </li>
+                    <li>
+                        Save checkpoints: เมื่อ user ผ่านแต่ละ main frame ให้
+                        POST checkpoint ไปยัง backend
+                    </li>
+                </ul>
 
-      <h2>11 - Validation, Testing และ Versioning</h2>
-      <p>แนะนำ:</p>
-      <ul>
-        <li>เขียน schema (JSON Schema) สำหรับโครงสร้างโปรเจกต์เพื่อ validate ก่อนโหลด</li>
-        <li>unit tests สำหรับการแปลง graphV2 -> frames, token replacement, และ parsing ของ choices</li>
-        <li>เก็บหมายเลขเวอร์ชันในไฟล์ JSON และ handle migration functions เมื่อโครงสร้างเปลี่ยน</li>
-      </ul>
+                <h2>11 - Validation, Testing และ Versioning</h2>
+                <p>แนะนำ:</p>
+                <ul>
+                    <li>
+                        เขียน schema (JSON Schema) สำหรับโครงสร้างโปรเจกต์เพื่อ
+                        validate ก่อนโหลด
+                    </li>
+                    <li>
+                        unit tests สำหรับการแปลง graphV2 -> frames, token
+                        replacement, และ parsing ของ choices
+                    </li>
+                    <li>
+                        เก็บหมายเลขเวอร์ชันในไฟล์ JSON และ handle migration
+                        functions เมื่อโครงสร้างเปลี่ยน
+                    </li>
+                </ul>
 
-      <h2>12 - Troubleshooting & ข้อควรระวัง</h2>
-      <ul>
-        <li>ปัญหา "showToast is not defined": ตรวจสอบลำดับการโหลดสคริปต์ ให้ `ui-overrides.js` โหลดก่อน `main.js`</li>
-        <li>ภาพไม่ขึ้น: ตรวจสอบว่า URL อยู่ในรูปแบบ data:image หรือ accessible external URL และ console errors ของเบราว์เซอร์</li>
-        <li>performance issue: ใช้ profiling เพื่อตรวจสอบการ decode รูปภาพซ้ำซ้อน หรือ DOM updates บ่อยเกินไป</li>
-        <li>security: หลีกเลี่ยงการรันโค้ดจาก `choices.exec` หากไฟล์มาจากแหล่งไม่เชื่อถือ</li>
-      </ul>
+                <h2>12 - Troubleshooting & ข้อควรระวัง</h2>
+                <ul>
+                    <li>
+                        ปัญหา "showToast is not defined":
+                        ตรวจสอบลำดับการโหลดสคริปต์ ให้ `ui-overrides.js`
+                        โหลดก่อน `main.js`
+                    </li>
+                    <li>
+                        ภาพไม่ขึ้น: ตรวจสอบว่า URL อยู่ในรูปแบบ data:image หรือ
+                        accessible external URL และ console errors
+                        ของเบราว์เซอร์
+                    </li>
+                    <li>
+                        performance issue: ใช้ profiling เพื่อตรวจสอบการ decode
+                        รูปภาพซ้ำซ้อน หรือ DOM updates บ่อยเกินไป
+                    </li>
+                    <li>
+                        security: หลีกเลี่ยงการรันโค้ดจาก `choices.exec`
+                        หากไฟล์มาจากแหล่งไม่เชื่อถือ
+                    </li>
+                </ul>
 
-      <h2>Appendix - ตัวอย่าง JSON ขนาดเล็กสำหรับทดสอบ</h2>
-      <pre>{
+                <h2>Appendix - ตัวอย่าง JSON ขนาดเล็กสำหรับทดสอบ</h2>
+                <pre>
+{
   "assets": { "backgrounds": [ {"name":"none","url":null} ] },
   "characters": [
     {"id":"c1","name":"Hiro","color":"#60a5fa","bodies":[{"name":"default","url":null}],"faces":[{"name":"smile","x":50,"y":20,"scale":1,"url":null}]}
@@ -569,75 +988,92 @@ function renderFrame(frame, maps) {
       {"id":101,"text":"The End","speakerId":"c1","background":"none","slots":[{"charId":"c1","body":"default","face":"smile","x":0,"y":0,"scale":1,"mirror":false}],"attributes":{}}
     ]
   }]
-}</pre>
+}</pre
+                >
 
-      <p class="note">หากต้องการ ผมสามารถแปลงตัวอย่าง renderer นี้เป็นโมดูล reusable, เพิ่ม JSON Schema สำหรับ validate, หรือสร้างตัวอย่าง production pipeline (แยกไฟล์รูปภาพ, เว็บเซิร์ฟเวอร์ static assets) - แจ้งงานที่ต้องการต่อได้เลย</p>
+                <p class="note">
+                    หากต้องการ ผมสามารถแปลงตัวอย่าง renderer นี้เป็นโมดูล
+                    reusable, เพิ่ม JSON Schema สำหรับ validate,
+                    หรือสร้างตัวอย่าง production pipeline (แยกไฟล์รูปภาพ,
+                    เว็บเซิร์ฟเวอร์ static assets) - แจ้งงานที่ต้องการต่อได้เลย
+                </p>
 
-      <footer style="margin-top:18px;color:#64748b">Document_Detailed_TH.html - created to help developers integrate and build upon Visual VN Editor export format.</footer>
-    </div>
+                <footer style="margin-top: 18px; color: #64748b">
+                    Document_Detailed_TH.html - created to help developers
+                    integrate and build upon Visual VN Editor export format.
+                </footer>
+            </div>
 
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/highlight.min.js"></script>
-    <script>
-      document.addEventListener('DOMContentLoaded', ()=>{
-        document.querySelectorAll('pre').forEach(pre=>{
-          if (!pre.querySelector('code')){
-            const text = pre.textContent;
-            const code = document.createElement('code');
-            const t = text.trim();
-            if (t.startsWith('{') || t.startsWith('[')) code.className = 'language-json';
-            else if (t.includes('function') || t.includes('async') || t.includes('=>') || t.includes('//')) code.className = 'language-javascript';
-            code.textContent = text;
-            pre.textContent = '';
-            pre.appendChild(code);
-          }
-        });
-        if (window.hljs && typeof hljs.highlightAll === 'function') hljs.highlightAll();
-      });
-    </script>
-  </div>
+            <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/highlight.min.js"></script>
+            <script>
+                document.addEventListener("DOMContentLoaded", () => {
+                    document.querySelectorAll("pre").forEach((pre) => {
+                        if (!pre.querySelector("code")) {
+                            const text = pre.textContent;
+                            const code = document.createElement("code");
+                            const t = text.trim();
+                            if (t.startsWith("{") || t.startsWith("["))
+                                code.className = "language-json";
+                            else if (
+                                t.includes("function") ||
+                                t.includes("async") ||
+                                t.includes("=>") ||
+                                t.includes("//")
+                            )
+                                code.className = "language-javascript";
+                            code.textContent = text;
+                            pre.textContent = "";
+                            pre.appendChild(code);
+                        }
+                    });
+                    if (window.hljs && typeof hljs.highlightAll === "function")
+                        hljs.highlightAll();
+                });
+            </script>
+        </div>
 
-  <script>
-    const toggle = document.getElementById('langToggle');
-    const contentEn = document.getElementById('content-en');
-    const contentTh = document.getElementById('content-th');
-    const labelEn = document.getElementById('label-en');
-    const labelTh = document.getElementById('label-th');
-    const docTitle = document.getElementById('doc-title');
+        <script>
+            const toggle = document.getElementById("langToggle");
+            const contentEn = document.getElementById("content-en");
+            const contentTh = document.getElementById("content-th");
+            const labelEn = document.getElementById("label-en");
+            const labelTh = document.getElementById("label-th");
+            const docTitle = document.getElementById("doc-title");
 
-    function updateView() {
-      if (toggle.checked) {
-        // Checked = Thai
-        contentEn.classList.add('hidden');
-        contentTh.classList.remove('hidden');
-        labelTh.classList.add('active');
-        labelEn.classList.remove('active');
-        docTitle.textContent = "DocumentVisual VN Editor";
-        document.documentElement.lang = "th";
-      } else {
-        // Unchecked = English (Default)
-        contentTh.classList.add('hidden');
-        contentEn.classList.remove('hidden');
-        labelEn.classList.add('active');
-        labelTh.classList.remove('active');
-        docTitle.textContent = "DocumentVisual VN Editor";
-        document.documentElement.lang = "en";
-      }
-    }
+            function updateView() {
+                if (toggle.checked) {
+                    // Checked = Thai
+                    contentEn.classList.add("hidden");
+                    contentTh.classList.remove("hidden");
+                    labelTh.classList.add("active");
+                    labelEn.classList.remove("active");
+                    docTitle.textContent = "DocumentVisual VN Editor";
+                    document.documentElement.lang = "th";
+                } else {
+                    // Unchecked = English (Default)
+                    contentTh.classList.add("hidden");
+                    contentEn.classList.remove("hidden");
+                    labelEn.classList.add("active");
+                    labelTh.classList.remove("active");
+                    docTitle.textContent = "DocumentVisual VN Editor";
+                    document.documentElement.lang = "en";
+                }
+            }
 
-    function setLang(lang) {
-      if (lang === 'th') {
-        toggle.checked = true;
-      } else {
-        toggle.checked = false;
-      }
-      updateView();
-    }
+            function setLang(lang) {
+                if (lang === "th") {
+                    toggle.checked = true;
+                } else {
+                    toggle.checked = false;
+                }
+                updateView();
+            }
 
-    // Event Listeners
-    toggle.addEventListener('change', updateView);
+            // Event Listeners
+            toggle.addEventListener("change", updateView);
 
-    // Initial state check
-    updateView();
-  </script>
-</body>
+            // Initial state check
+            updateView();
+        </script>
+    </body>
 </html>

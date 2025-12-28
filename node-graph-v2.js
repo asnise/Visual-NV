@@ -26,7 +26,7 @@
       colors: {
         bg: "var(--bg-app)",
         panel: "var(--bg-panel)",
-        panel2: "var(--bg-secondary)",
+        panel2: "var(--bg-panel)",
         border: "var(--border)",
         text: "var(--text-main)",
         muted: "var(--text-muted)",
@@ -262,8 +262,10 @@
         for (const l of STATE.links || []) {
           const fromN = nodeById.get(safeId(l?.from?.nodeId));
           const toN = nodeById.get(safeId(l?.to?.nodeId));
-          if (fromN && fromN.type === "start" && toN && toN.type === "frame") start = Number(toN.frameId);
-          if (toN && toN.type === "end" && fromN && fromN.type === "frame") end = Number(fromN.frameId);
+          if (fromN && fromN.type === "start" && toN && toN.type === "frame")
+            start = Number(toN.frameId);
+          if (toN && toN.type === "end" && fromN && fromN.type === "frame")
+            end = Number(fromN.frameId);
         }
         STATE.startFrameId = start != null ? start : STATE.startFrameId;
         STATE.endFrameId = end != null ? end : STATE.endFrameId;
@@ -402,9 +404,9 @@
         const inputs = [{ id: "in", label: "In", kind: "in" }];
 
         const outputs = [];
-        outputs.push({ id: "next", label: "Next", kind: "next" });
 
         const choices = Array.isArray(frame?.choices) ? frame.choices : [];
+
         for (const c of choices) {
           if (!c || typeof c !== "object") continue;
           const type = (c.type || "jump").toLowerCase();
@@ -419,11 +421,18 @@
           });
         }
 
+        if (outputs.length === 0) {
+          outputs.push({ id: "next", label: "Next", kind: "next" });
+        }
+
         return { inputs, outputs };
       }
 
       if (node.type === "start") {
-        return { inputs: [], outputs: [{ id: "next", label: "Out", kind: "next" }] };
+        return {
+          inputs: [],
+          outputs: [{ id: "next", label: "Out", kind: "next" }],
+        };
       }
 
       if (node.type === "end") {
@@ -635,7 +644,6 @@
   grid-template-rows: 52px 1fr;
   overflow: hidden;
   color: ${CFG.colors.text};
-  font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
 }
 
 .ngv2-header {
@@ -696,7 +704,7 @@
 .ngv2-canvas {
   position: absolute;
   inset: 0;
-  background: #222126;
+  background: ${CFG.colors.bg};
 }
 
 .ngv2-svg {
@@ -813,7 +821,7 @@
   .ngv2-badge.end { border-color: rgba(239,68,68,0.5); background: rgba(239,68,68,0.08); }
 .ngv2-badge.instant { border-color: rgba(245,158,11,0.5); background: rgba(245,158,11,0.12); }
 
-.ngv2-nodeBody { padding: ${CFG.node.pad}px; display:flex; flex-direction: column; gap: 8px; }
+.ngv2-nodeBody { padding: ${CFG.node.pad}px; display:flex; flex-direction: column; gap: 8px; background: ${CFG.colors.bg}; border-radius: var(--radius-xl);}
 
 
 .ngv2-portsGrid{
@@ -1184,9 +1192,12 @@
       if (node.type === "start") titleText = "Start";
       else if (node.type === "end") titleText = "End";
       else {
-        const rawText = String(frame?.text || "").trim().replace(/\s+/g, " ");
+        const rawText = String(frame?.text || "")
+          .trim()
+          .replace(/\s+/g, " ");
         const MAX = 25;
-        titleText = rawText.length > MAX ? rawText.slice(0, MAX) + "..." : rawText;
+        titleText =
+          rawText.length > MAX ? rawText.slice(0, MAX) + "..." : rawText;
       }
 
       b.textContent = titleText || "";

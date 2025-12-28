@@ -6,7 +6,7 @@ let appSettings = {
   hwAccel: true,
 };
 
-let originalSettings = null; 
+let originalSettings = null;
 
 function loadSettings() {
   const stored = localStorage.getItem("vnEditorSettings");
@@ -21,8 +21,15 @@ function loadSettings() {
 }
 
 function openSettingsModal() {
-  
   originalSettings = { ...appSettings };
+
+  const bgSelect = document.getElementById("settingStageBackground");
+  if (bgSelect && !bgSelect.querySelector("option[value='checkerboard']")) {
+    const opt = document.createElement("option");
+    opt.value = "checkerboard";
+    opt.textContent = "Checkerboard";
+    bgSelect.appendChild(opt);
+  }
 
   document.getElementById("settingTheme").value = appSettings.theme;
   document.getElementById("settingUIScale").value = appSettings.uiScale;
@@ -32,7 +39,6 @@ function openSettingsModal() {
   document.getElementById("settingTransitions").checked =
     appSettings.transitions;
 
-  
   const themeSelect = document.getElementById("settingTheme");
   themeSelect.addEventListener("change", previewThemeChange);
 
@@ -40,23 +46,19 @@ function openSettingsModal() {
 }
 
 function previewThemeChange(e) {
-  
   appSettings.theme = e.target.value;
   applyEffects();
 
-  
   if (typeof window.NodeGraph !== "undefined" && window.NodeGraph.updateTheme) {
     window.NodeGraph.updateTheme();
   }
 }
 
 function cancelSettings() {
-  
   if (originalSettings) {
     appSettings = { ...originalSettings };
     applyEffects();
 
-    
     if (
       typeof window.NodeGraph !== "undefined" &&
       window.NodeGraph.updateTheme
@@ -65,16 +67,13 @@ function cancelSettings() {
     }
   }
 
-  
   const themeSelect = document.getElementById("settingTheme");
   themeSelect.removeEventListener("change", previewThemeChange);
 
-  
   document.getElementById("settingsModal").style.display = "none";
 }
 
 function saveAndApplySettings() {
-  
   appSettings.theme = document.getElementById("settingTheme").value;
   appSettings.uiScale = parseFloat(
     document.getElementById("settingUIScale").value,
@@ -86,7 +85,6 @@ function saveAndApplySettings() {
   appSettings.transitions =
     document.getElementById("settingTransitions").checked;
 
-  
   try {
     localStorage.setItem("vnEditorSettings", JSON.stringify(appSettings));
   } catch (e) {
@@ -95,16 +93,13 @@ function saveAndApplySettings() {
 
   applyEffects();
 
-  
   if (typeof window.NodeGraph !== "undefined" && window.NodeGraph.updateTheme) {
     window.NodeGraph.updateTheme();
   }
 
-  
   const themeSelect = document.getElementById("settingTheme");
   themeSelect.removeEventListener("change", previewThemeChange);
 
-  
   document.getElementById("settingsModal").style.display = "none";
 
   if (typeof showToast === "function") {
@@ -156,6 +151,19 @@ function applyEffects() {
       document.head.appendChild(style);
     }
     if (el) el.remove();
+  }
+
+  const stageEl =
+    document.querySelector(".stage-viewport") ||
+    document.getElementById("stage");
+  if (stageEl) {
+    if (appSettings.stageBackground === "checkerboard") {
+      stageEl.classList.add("checkerboard-bg");
+      stageEl.style.background = "";
+    } else {
+      stageEl.classList.remove("checkerboard-bg");
+      stageEl.style.background = appSettings.stageBackground;
+    }
   }
 
   if (typeof renderStage === "function") {

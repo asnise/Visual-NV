@@ -72,9 +72,7 @@ option,
 
 body {
     margin: 0;
-    font-family:
-        -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial,
-        sans-serif;
+    font-family: "Sarabun", sans-serif;
     background-color: var(--bg-app);
     color: var(--text-main);
     height: 100vh;
@@ -163,7 +161,7 @@ header {
 
 button {
     cursor: pointer;
-    font-size: 13px;
+    font-size: 24px;
     border-radius: 6px;
     padding: 6px 12px;
     transition: all 0.2s;
@@ -174,7 +172,7 @@ button {
 }
 
 button:hover {
-    background: var(--hover-bg);
+    color: var(--text-subtle);
 }
 
 .modal-box {
@@ -797,6 +795,21 @@ textarea {
     height: 600px;
 }
 
+.checkerboard-bg {
+    background-color: #ffffff;
+    background-image:
+        linear-gradient(45deg, #e0e0e0 25%, transparent 25%),
+        linear-gradient(-45deg, #e0e0e0 25%, transparent 25%),
+        linear-gradient(45deg, transparent 75%, #e0e0e0 75%),
+        linear-gradient(-45deg, transparent 75%, #e0e0e0 75%);
+    background-size: 20px 20px;
+    background-position:
+        0 0,
+        0 10px,
+        10px -10px,
+        -10px 0px;
+}
+
 .modal-header {
     padding: 15px 20px;
     border-bottom: 1px solid var(--border);
@@ -1386,6 +1399,10 @@ textarea {
         gap: 8px;
     }
 
+    .stage-controls {
+        display: none;
+    }
+
     .sidebar,
     .inspector {
         width: 100%;
@@ -1430,14 +1447,28 @@ textarea {
         overflow-x: auto;
     }
 
-    header .actions { order: 3; }
+    header .actions {
+        order: 3;
+    }
 
-    button, .icon-btn, .primary-btn { padding: 10px 12px; min-height: 44px; }
-    .draggable-char { min-height: 48px; }
+    button,
+    .icon-btn,
+    .primary-btn {
+        padding: 10px 12px;
+        min-height: 44px;
+    }
+    .draggable-char {
+        min-height: 48px;
+    }
 
-    .preview-viewport { width: 100%; height: auto; }
+    .preview-viewport {
+        width: 100%;
+        height: auto;
+    }
 
-    body { font-size: 14px; }
+    body {
+        font-size: 14px;
+    }
 }
 
 @media (max-width: 800px) and (orientation: portrait) {
@@ -1448,21 +1479,34 @@ textarea {
         display: flex;
         align-items: center;
         justify-content: center;
-        background: rgba(0,0,0,0.6);
+        background: rgba(0, 0, 0, 0.6);
         color: #fff;
         text-align: center;
         padding: 20px;
         font-size: 16px;
     }
 
-    .workspace { filter: blur(2px) brightness(0.8); pointer-events: none; }
+    .workspace {
+        filter: blur(2px) brightness(0.8);
+        pointer-events: none;
+    }
 }
 
 @media (max-width: 800px) and (orientation: landscape) {
-    .sidebar { max-width: 220px; flex: 0 0 220px; }
-    .inspector { max-width: 220px; flex: 0 0 220px; }
-    .stage-area { flex: 1 1 auto; }
-    body { font-size: 13px; }
+    .sidebar {
+        max-width: 220px;
+        flex: 0 0 220px;
+    }
+    .inspector {
+        max-width: 220px;
+        flex: 0 0 220px;
+    }
+    .stage-area {
+        flex: 1 1 auto;
+    }
+    body {
+        font-size: 13px;
+    }
 }
 
 @media (max-width: 1024px) and (orientation: landscape) {
@@ -1504,47 +1548,64 @@ textarea {
         border-left: 1px solid var(--border);
     }
 
-    .panel-header { font-size: 11px; padding: 8px; }
-    .cast-grid { padding: 8px; }
-    .inspector-content { padding: 8px; }
+    .panel-header {
+        font-size: 11px;
+        padding: 8px;
+    }
+    .cast-grid {
+        padding: 8px;
+    }
+    .inspector-content {
+        padding: 8px;
+    }
 
-    .filmstrip-panel { order: 4; width: 100%; flex: 0 0 auto;     height: 150px; }
+    .filmstrip-panel {
+        order: 4;
+        width: 100%;
+        flex: 0 0 auto;
+        height: 150px;
+    }
 }
 
 @media (max-width: 1024px) {
-  #mobileMenuToggle {
-    display: inline-flex !important;
-    visibility: visible !important;
-  }
+    #mobileMenuToggle {
+        display: inline-flex !important;
+        visibility: visible !important;
+    }
 
-  .mobile-menu-overlay {
-    position: fixed;
-    top: 40px;
-    left: 0;
-    right: 0;
-    background: var(--bg-panel);
-    border-bottom: 1px solid var(--border);
-    z-index: 15000;
-    display: none;
-    max-height: calc(100vh - 40px);
-    overflow: auto;
-    padding: 10px 0;
-  }
+    .mobile-menu-overlay {
+        position: fixed;
+        top: 40px;
+        left: 0;
+        right: 0;
+        background: var(--bg-panel);
+        border-bottom: 1px solid var(--border);
+        z-index: 15000;
+        display: none;
+        max-height: calc(100vh - 40px);
+        overflow: auto;
+        padding: 10px 0;
+    }
 
-  body.mobile-nav-open .mobile-menu-overlay { display: flex; flex-direction: column; }
+    body.mobile-nav-open .mobile-menu-overlay {
+        display: flex;
+        flex-direction: column;
+    }
 
-  .menu-bar { gap: 6px; }
+    .menu-bar {
+        gap: 6px;
+    }
 
-  .mobile-menu-overlay .menu-item {
-    padding: 10px 15px;
-    border-bottom: 1px solid var(--border-light);
-    flex-direction: column;
-  }
+    .mobile-menu-overlay .menu-item {
+        padding: 10px 15px;
+        border-bottom: 1px solid var(--border-light);
+        flex-direction: column;
+    }
 
-body.mobile-panels-hidden .sidebar,
-body.mobile-panels-hidden .inspector {
-    display: none !important;
-}
+    body.mobile-panels-hidden .sidebar,
+    body.mobile-panels-hidden .inspector {
+        display: none !important;
+    }
 }
 
 #mobileMenuBtn {
@@ -1607,14 +1668,12 @@ body.mobile-panels-hidden .inspector {
         display: none;
     }
 
-    .large-modal
-    {
+    .large-modal {
         width: 800px;
         height: 400px;
     }
 
-    .char-editor-layout
-    {
+    .char-editor-layout {
         height: 250px;
     }
 
@@ -1636,6 +1695,16 @@ body.mobile-panels-hidden .inspector {
 
     .dropdown-content button {
         padding: 12px 10px;
-        border-bottom: 1px solid rgba(0,0,0,0.05);
+        border-bottom: 1px solid rgba(0, 0, 0, 0.05);
     }
+}
+
+/* Mobile: allow app-handled pinch zoom / pan (prevent browser scroll/zoom inside the stage) */
+#stageWrapper {
+    touch-action: none;
+}
+
+/* Mobile: allow app-handled pinch zoom / pan inside overlay editor */
+#overlayEditorContainer {
+    touch-action: none;
 }
