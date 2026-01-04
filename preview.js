@@ -3,9 +3,6 @@ let previousCharRects = new Map();
 let typingTimer = null;
 let lastMainFrameIndex = -1;
 
-
-
-
 function updatePreviewRatio() {
   const vp = document.getElementById("pViewport");
   if (!vp) return;
@@ -85,7 +82,14 @@ function renderPreviewFrame() {
 
   const choiceContainer = document.getElementById("pChoiceContainer");
   choiceContainer.innerHTML = "";
+
   if (frame.choices && frame.choices.length > 0) {
+    if (frame.choices.length > 3) {
+      choiceContainer.classList.add("dynamic-grid");
+    } else {
+      choiceContainer.classList.remove("dynamic-grid");
+    }
+
     frame.choices.forEach((choice) => {
       const btn = document.createElement("div");
       btn.className = "p-choice-btn";
@@ -99,6 +103,7 @@ function renderPreviewFrame() {
     choiceContainer.classList.add("visible");
   } else {
     choiceContainer.classList.remove("visible");
+    choiceContainer.classList.remove("dynamic-grid");
   }
 
   const newSlotCharIds = new Set();
@@ -240,22 +245,26 @@ function openPreview() {
     const ch = getChapter();
     const g = ch ? ch.graphV2 || ch["graphV2"] : null;
     if (!g || !g.startFrameId || !g.endFrameId) {
-      if (typeof showToast === "function")
-      {
+      if (typeof showToast === "function") {
         showToast("Please set Start and End in Storyline Node Editor", "error");
       }
-        return;
+      return;
     }
 
     // Build node id map to test reachability
     const nodes = Array.isArray(g.nodes) ? g.nodes : [];
     const links = Array.isArray(g.links) ? g.links : [];
     const nodeById = new Map(nodes.map((n) => [String(n.id), n]));
-    let startNode = nodes.find((n) => Number(n.frameId) === Number(g.startFrameId));
+    let startNode = nodes.find(
+      (n) => Number(n.frameId) === Number(g.startFrameId),
+    );
     let endNode = nodes.find((n) => Number(n.frameId) === Number(g.endFrameId));
     if (!startNode || !endNode) {
       if (typeof showToast === "function")
-        showToast("Start or End node not found in Storyline Node Editor", "error");
+        showToast(
+          "Start or End node not found in Storyline Node Editor",
+          "error",
+        );
       return;
     }
 
@@ -289,7 +298,10 @@ function openPreview() {
 
     if (!found) {
       if (typeof showToast === "function")
-        showToast("Start and End are not connected in Storyline. Please connect them.", "error");
+        showToast(
+          "Start and End are not connected in Storyline. Please connect them.",
+          "error",
+        );
       return;
     }
   } catch (e) {
@@ -309,14 +321,11 @@ function nextPreview() {
   const chapter = getChapter();
   const currentFrame = chapter.frames[previewCurrentIndex];
 
-  
   if (currentFrame && currentFrame.choices && currentFrame.choices.length > 0)
     return;
 
   const isInstant = currentFrame && currentFrame.frameType === "instant";
 
-  
-  
   if (isInstant) {
     const nextId =
       currentFrame &&
@@ -352,9 +361,6 @@ function nextPreview() {
     return;
   }
 
-  
-  
-  
   const nextId =
     currentFrame &&
     currentFrame.attributes &&
@@ -362,7 +368,6 @@ function nextPreview() {
     String(currentFrame.attributes.next).trim();
 
   if (!nextId) {
-    
     closeModal("previewModal");
     window.removeEventListener("resize", updatePreviewRatio);
     if (typingTimer) clearTimeout(typingTimer);
@@ -389,8 +394,6 @@ function nextPreview() {
   renderPreviewFrame();
 }
 
-
-
 function handleChoiceClick(choice) {
   if (choice.type === "jump") {
     const chapter = getChapter();
@@ -398,9 +401,6 @@ function handleChoiceClick(choice) {
     const targetIdx = chapter.frames.findIndex((f) => f.id === targetId);
 
     if (targetIdx !== -1) {
-      
-      
-      
       previewCurrentIndex = targetIdx;
       renderPreviewFrame();
     } else {

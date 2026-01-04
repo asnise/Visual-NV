@@ -964,7 +964,7 @@ textarea {
 
 .p-choice-container {
     position: absolute;
-    top: 50%;
+    top: 35%;
     left: 50%;
     transform: translate(-50%, -50%);
     width: 60%;
@@ -977,6 +977,26 @@ textarea {
     transition:
         opacity 0.4s ease,
         transform 0.4s ease;
+    max-height: 80vh;
+    overflow-y: auto;
+    scrollbar-width: thin;
+    padding: 10px;
+}
+
+#mobilePanelToggle {
+    display: none;
+}
+
+#previewModal .modal-header {
+    height: 20px;
+}
+
+.p-choice-container.dynamic-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr; /* แบ่งเป็น 2 คอลัมน์เท่ากัน */
+    gap: 12px; /* ระยะห่างระหว่างปุ่ม */
+    width: 80%; /* ขยายความกว้างขึ้นเพื่อให้ 2 คอลัมน์ไม่อึดอัด */
+    align-content: center; /* จัดกึ่งกลางแกนตั้ง */
 }
 
 .p-choice-container.visible {
@@ -998,6 +1018,18 @@ textarea {
     cursor: pointer;
     transition: all 0.2s ease;
     box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
+}
+
+.p-choice-container::-webkit-scrollbar {
+    width: 6px;
+}
+.p-choice-container::-webkit-scrollbar-track {
+    background: rgba(0, 0, 0, 0.1);
+    border-radius: 3px;
+}
+.p-choice-container::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.3);
+    border-radius: 3px;
 }
 
 .p-choice-btn:hover {
@@ -1394,6 +1426,10 @@ textarea {
 }
 
 @media (max-width: 1024px) {
+    #mobilePanelToggle {
+        display: block;
+    }
+
     .workspace {
         flex-direction: column;
         gap: 8px;
