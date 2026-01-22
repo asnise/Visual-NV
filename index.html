@@ -317,6 +317,11 @@
                 </button>
             </div>
             <div class="preview-viewport" id="pViewport" style="position: relative; aspect-ratio: 16/9">
+                <div style="position: absolute; top: 15px; left: 15px; z-index: 300;">
+                    <select id="previewLangSelect" class="preview-lang-select" onclick="event.stopPropagation()"
+                        onmousedown="event.stopPropagation()">
+                    </select>
+                </div>
                 <div class="nav-zone-right" onclick="
                             if (
                                 !document
@@ -469,6 +474,42 @@
         </div>
     </div>
 
+    <div id="textEditorModal" class="modal-overlay">
+        <div class="modal-box" style="width: 600px; max-width: 90vw; height: 500px;">
+            <div class="modal-header">
+                <h3>Dialogue Editor</h3>
+                <button onclick="closeModal('textEditorModal')">&times;</button>
+            </div>
+
+            <div class="modal-body"
+                style="padding: 0; display: flex; flex-direction: column; height: 300px; overflow: hidden;">
+                <div class="rte-toolbar-horizontal">
+                    <button class="rte-btn" onclick="editorInsertTag('b')" title="Bold"><b>B</b></button>
+                    <button class="rte-btn" onclick="editorInsertTag('i')" title="Italic"><i>I</i></button>
+                    <button class="rte-btn" onclick="editorInsertTag('u')" title="Underline"><u>U</u></button>
+                    <button class="rte-btn" onclick="editorInsertTag('s')" title="Strikethrough"><s>S</s></button>
+                    <div class="rte-sep"></div>
+                    <button class="rte-btn" onclick="editorInsertTag('color')" title="Color"><span
+                            style="color:#3b82f6; font-weight:bold;">A</span></button>
+                    <button class="rte-btn" onclick="editorInsertTag('size')" title="Size"><span
+                            style="font-size:10px">T</span><span style="font-size:14px">T</span></button>
+                    <div class="rte-sep"></div>
+                    <button class="rte-btn" onclick="editorInsertTag('br')" title="Line Break">↵</button>
+                </div>
+
+                <textarea id="modalTextInput" class="modal-text-input" style="flex: 1; height: auto; resize: none;"
+                    placeholder="Type dialogue text here..." oninput="onModalTextChange(this.value)"></textarea>
+
+            </div>
+
+            <div class="modal-footer">
+                <button class="danger" onclick="closeModal('textEditorModal')"
+                    style="margin-right: auto;">Cancel</button>
+                <button class="primary-btn" onclick="saveTextEditor()">Save & Close</button>
+            </div>
+        </div>
+    </div>
+
     <div id="slideContextMenu" class="context-menu">
         <button onclick="contextMenuAction('copy')">Copy</button>
         <button onclick="contextMenuAction('cut')">Cut</button>
@@ -478,6 +519,7 @@
             Remove
         </button>
     </div>
+
 
     <script src="settings.js"></script>
     <script src="pinch-zoom.override.js"></script>

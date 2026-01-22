@@ -49,7 +49,7 @@ const VN_LOCAL_PROJECT_KEY = "vnEditorProject_v1";
 const VN_LOCAL_PROJECT_VERSION = 1;
 
 let editorLanguage = "EN";
-const supportedLanguages = ["EN", "TH", "JP", "CN", "KR"];
+let supportedLanguages = ["EN", "TH", "JP", "CN", "KR"];
 
 let __saveTimer = null;
 function scheduleAutoSave(reason = "") {
@@ -92,6 +92,12 @@ function tryRestoreFromLocalStorage() {
     if (!payload.data || !payload.data.project) return false;
 
     project = payload.data.project;
+
+    // --- START ADDITION: Restore Languages ---
+    if (Array.isArray(project.languages)) {
+      supportedLanguages = project.languages;
+    }
+    // --- END ADDITION ---
 
     const ui = payload.data.ui || {};
     if (typeof ui.activeChapterId === "number")
@@ -274,6 +280,9 @@ function newProject() {
   if (!ok) return;
 
   project = {
+    // --- START ADDITION: Default Languages ---
+    languages: ["EN", "TH", "JP", "CN", "KR"],
+    // --- END ADDITION ---
     assets: { backgrounds: [] },
     characters: [],
     chapters: [
@@ -292,6 +301,9 @@ function newProject() {
       },
     ],
   };
+
+  // Sync global variable
+  supportedLanguages = project.languages;
 
   activeChapterId = project.chapters[0].id;
   loadChapter(activeChapterId);
@@ -366,11 +378,69 @@ function changeEditorLanguage(lang) {
   scheduleAutoSave("change_editor_language");
 }
 
+function handleLanguageSelect(selectEl) {
+  const val = selectEl.value;
+  if (val === "__ADD_NEW__") {
+    // Reset กลับไปค่าเดิมก่อน เพื่อไม่ให้ UI ค้างอยู่ที่คำว่า Add New
+    selectEl.value = editorLanguage;
+    addNewLanguage();
+  } else {
+    changeEditorLanguage(val);
+  }
+}
+
+function addNewLanguage() {
+  // ใช้ showPrompt ซึ่งเป็น Modal ของระบบ (จาก ui-overrides.js)
+  if (typeof showPrompt === "function") {
+    showPrompt("Add New Language", "Enter language code (e.g. FR, DE, VI):", (val) => {
+      const code = val ? val.toUpperCase().trim() : "";
+
+      if (!code) return;
+
+      if (supportedLanguages.includes(code)) {
+        if (typeof showToast === "function") showToast("Language already exists!", "error");
+        return;
+      }
+
+      supportedLanguages.push(code);
+
+      if (!project.languages) project.languages = [...supportedLanguages];
+      else if (!project.languages.includes(code)) project.languages.push(code);
+
+      changeEditorLanguage(code);
+
+      if (typeof showToast === "function") showToast(`Language ${code} added`, "success");
+    });
+  } else {
+    // Fallback กรณีไม่มี ui-overrides
+    const lang = prompt("Enter new language code:");
+    if (lang) {
+      const code = lang.toUpperCase().trim();
+      if (code && !supportedLanguages.includes(code)) {
+        supportedLanguages.push(code);
+        if (!project.languages) project.languages = [...supportedLanguages];
+        else project.languages.push(code);
+        changeEditorLanguage(code);
+      }
+    }
+  }
+}
+
 function updateFrameChoice(index, key, val) {
   const frame = getFrame();
   if (!frame.choices) frame.choices = [];
   if (frame.choices[index]) {
-    frame.choices[index][key] = val;
+    if (key === "text") {
+      const c = frame.choices[index];
+      if (typeof c.text !== "object" || c.text === null) {
+        c.text = {
+          "EN": c.text || ""
+        };
+      }
+      c.text[editorLanguage] = val;
+    } else {
+      frame.choices[index][key] = val;
+    }
     if (key === "type") renderInspector();
   }
 }
@@ -623,13 +693,8 @@ function renderStage() {
     ? speaker.color
     : "#666";
 
-  let text = getLocalizedFrameText(frame) || "Click here to edit text...";
-
-  text = text.replace(
-    /\{([^}]+)\}/g,
-    '<span style="color:#3b82f6;font-weight:bold;">[$1]</span>',
-  );
-  document.getElementById("overlayText").innerHTML = text;
+  let text = getLocalizedFrameText(frame) || "";
+  document.getElementById("overlayText").innerHTML = unityToHtml(text) || "Click here to edit text...";
 
   for (let i = 0; i < 5; i++) {
     const zone = document.querySelector(`.slot-zone[data-slot="${i}"]`);
@@ -768,74 +833,290 @@ function renderFilmstrip() {
   reel.innerHTML = html;
 }
 
+function unityToHtml(text) {
+  if (!text) return "";
+  let html = text.replace(/</g, "&lt;").replace(/>/g, "&gt;");
+  html = html.replace(/&lt;b&gt;(.*?)&lt;\/b&gt;/gi, "<b>$1</b>");
+  html = html.replace(/&lt;i&gt;(.*?)&lt;\/i&gt;/gi, "<i>$1</i>");
+  html = html.replace(/&lt;u&gt;(.*?)&lt;\/u&gt;/gi, "<u>$1</u>");
+  html = html.replace(/&lt;s&gt;(.*?)&lt;\/s&gt;/gi, "<s>$1</s>");
+  html = html.replace(/&lt;color=(.*?)&gt;(.*?)&lt;\/color&gt;/gi, "<span style='color:$1'>$2</span>");
+  html = html.replace(/&lt;size=(.*?)&gt;(.*?)&lt;\/size&gt;/gi, "<span style='font-size:1.2em'>$2</span>");
+  html = html.replace(/\{([^}]+)\}/g, '<span style="color:#3b82f6;font-weight:bold;">[$1]</span>');
+  html = html.replace(/\n/g, "<br>");
+  return html;
+}
+
+// ฟังก์ชันแทรก Tag ลงใน Textarea ณ ตำแหน่ง Cursor
+function insertTextTag(tagType) {
+  const textarea = document.getElementById("tmInput");
+  if (!textarea) return;
+
+  const start = textarea.selectionStart;
+  const end = textarea.selectionEnd;
+  const text = textarea.value;
+  const selectedText = text.substring(start, end);
+
+  let open = "";
+  let close = "";
+
+  switch (tagType) {
+    case "b": open = "<b>"; close = "</b>"; break;
+    case "i": open = "<i>"; close = "</i>"; break;
+    case "u": open = "<u>"; close = "</u>"; break;
+    case "s": open = "<s>"; close = "</s>"; break;
+    case "color": open = "<color=#FF0000>"; close = "</color>"; break;
+    case "size": open = "<size=120%>"; close = "</size>"; break;
+    case "br": open = "\n"; close = ""; break;
+  }
+
+  // ถ้าไม่มีการเลือกข้อความ ให้แทรก Tag คร่อมตรงกลางว่างๆ หรือแทรก Tag เปิดปิด
+  const replacement = open + selectedText + close;
+
+  textarea.value = text.substring(0, start) + replacement + text.substring(end);
+
+  // อัปเดตข้อมูลและ Preview
+  updateText(textarea.value);
+
+  // ย้าย Cursor ไปข้างใน Tag (กรณีไม่ได้เลือก Text) หรือหลัง Tag (กรณีเลือก Text)
+  const newCursorPos = selectedText.length > 0 ? start + replacement.length : start + open.length;
+  textarea.focus();
+  textarea.setSelectionRange(newCursorPos, newCursorPos);
+}
+
+// ฟังก์ชันอัปเดต Preview เมื่อพิมพ์
+function onTmInput(val) {
+  updateText(val); // ฟังก์ชันเดิมของระบบที่บันทึกข้อมูล
+  const previewEl = document.getElementById("tmPreview");
+  if (previewEl) previewEl.innerHTML = unityToHtml(val);
+}
+
+// --- Text Editor Logic ---
+let tempEditorText = ""; // เก็บค่าชั่วคราวก่อนกด Save
+
+// ฟังก์ชันเปิด Editor
+function openTextEditor() {
+  const frame = getFrame();
+  if (!frame) return;
+
+  const currentText = getLocalizedFrameText(frame);
+  tempEditorText = currentText;
+
+  // Setup Input
+  const input = document.getElementById("modalTextInput");
+  input.value = currentText;
+
+  // Trigger ให้แสดงผลที่หน้าจอ Stage ทันทีตอนเปิด
+  onModalTextChange(currentText);
+
+  openModal("textEditorModal");
+
+  // Auto focus at end of text
+  setTimeout(() => {
+    input.focus();
+    input.setSelectionRange(input.value.length, input.value.length);
+  }, 100);
+}
+
+// ฟังก์ชันทำงานเมื่อพิมพ์ข้อความ (Realtime Update)
+function onModalTextChange(val) {
+  tempEditorText = val;
+  const html = unityToHtml(val);
+
+  // 1. อัปเดตที่ Dialogue Box บน Workspace (ID: overlayText)
+  const workspaceText = document.getElementById("overlayText");
+  if (workspaceText) {
+    workspaceText.innerHTML = html || "<span style='opacity:0.5'>...</span>";
+  }
+
+  // 2. อัปเดตที่ Preview Player (ID: pText) ถ้าเปิดอยู่
+  const previewText = document.getElementById("pText");
+  if (previewText) {
+    previewText.innerHTML = html;
+  }
+}
+
+function saveTextEditor() {
+  // บันทึกค่าลงใน Frame จริงๆ
+  updateText(tempEditorText);
+  closeModal("textEditorModal");
+  renderInspector(); // Refresh Inspector
+}
+
+function showColorPicker(onSelect) {
+  const uiModal = document.getElementById("uiGenericModal");
+  const uiTitle = document.getElementById("uiModalTitle");
+  const uiMessage = document.getElementById("uiModalMessage");
+  const uiContent = document.getElementById("uiModalContent");
+  const btnConfirm = document.getElementById("uiModalConfirm");
+  const btnCancel = document.getElementById("uiModalCancel");
+
+  if (!uiModal) return;
+
+  uiTitle.textContent = "Select Color";
+  uiMessage.textContent = "Choose a color or enter hex code:";
+  uiContent.innerHTML = "";
+
+  btnConfirm.style.display = "none";
+
+  const grid = document.createElement("div");
+  grid.style.display = "grid";
+  grid.style.gridTemplateColumns = "repeat(5, 1fr)";
+  grid.style.gap = "8px";
+  grid.style.marginBottom = "15px";
+
+  const colors = [
+    "#ffffff", "#000000", "#ef4444", "#f97316", "#f59e0b",
+    "#10b981", "#3b82f6", "#6366f1", "#8b5cf6", "#ec4899",
+    "#64748b", "#a1a1aa", "#fee2e2", "#dbeafe", "#d1fae5"
+  ];
+
+  colors.forEach(c => {
+    const btn = document.createElement("div");
+    btn.style.backgroundColor = c;
+    btn.style.height = "32px";
+    btn.style.borderRadius = "4px";
+    btn.style.cursor = "pointer";
+    btn.style.border = "1px solid #ddd";
+    btn.title = c;
+
+    btn.onclick = () => {
+      onSelect(c);
+      uiModal.style.display = "none";
+      btnConfirm.style.display = "inline-block";
+    };
+    grid.appendChild(btn);
+  });
+
+  uiContent.appendChild(grid);
+
+  const wrapper = document.createElement("div");
+  wrapper.style.display = "flex";
+  wrapper.style.gap = "8px";
+  wrapper.style.alignItems = "center";
+
+  const input = document.createElement("input");
+  input.type = "text";
+  input.className = "ui-modal-input";
+  input.style.margin = "0";
+  input.style.flex = "1";
+  input.placeholder = "Hex (#RRGGBB)";
+
+  const okBtn = document.createElement("button");
+  okBtn.className = "primary-btn";
+  okBtn.textContent = "Use Hex";
+  okBtn.onclick = () => {
+    if (input.value) {
+      onSelect(input.value);
+      uiModal.style.display = "none";
+      btnConfirm.style.display = "inline-block";
+    }
+  };
+
+  wrapper.appendChild(input);
+  wrapper.appendChild(okBtn);
+  uiContent.appendChild(wrapper);
+
+  uiModal.style.display = "flex";
+  input.focus();
+
+  btnCancel.onclick = () => {
+    uiModal.style.display = "none";
+    btnConfirm.style.display = "inline-block";
+  };
+}
+
+function editorInsertTag(tagType) {
+  const textarea = document.getElementById("modalTextInput");
+  if (!textarea) return;
+
+  const start = textarea.selectionStart;
+  const end = textarea.selectionEnd;
+  const text = textarea.value;
+  const selectedText = text.substring(start, end);
+
+  if (tagType === "color") {
+    showColorPicker((color) => {
+      const open = `<color=${color}>`;
+      const close = `</color>`;
+      const replacement = open + selectedText + close;
+      textarea.value = text.substring(0, start) + replacement + text.substring(end);
+      onModalTextChange(textarea.value);
+      textarea.focus();
+      const newCursor = selectedText.length > 0 ? start + replacement.length : start + open.length;
+      textarea.setSelectionRange(newCursor, newCursor);
+    });
+    return;
+  }
+
+  let open = "", close = "";
+
+  switch (tagType) {
+    case "b": open = "<b>"; close = "</b>"; break;
+    case "i": open = "<i>"; close = "</i>"; break;
+    case "u": open = "<u>"; close = "</u>"; break;
+    case "s": open = "<s>"; close = "</s>"; break;
+    case "size": open = "<size=120%>"; close = "</size>"; break;
+    case "br": open = "\n"; close = ""; break;
+  }
+
+  const replacement = open + selectedText + close;
+  textarea.value = text.substring(0, start) + replacement + text.substring(end);
+
+  onModalTextChange(textarea.value);
+
+  textarea.focus();
+  const newCursor = selectedText.length > 0 ? start + replacement.length : start + open.length;
+  textarea.setSelectionRange(newCursor, newCursor);
+}
+
+function unityToHtml(text) {
+  if (!text) return "";
+  let html = text.replace(/</g, "&lt;").replace(/>/g, "&gt;");
+  html = html.replace(/&lt;b&gt;(.*?)&lt;\/b&gt;/gi, "<b>$1</b>");
+  html = html.replace(/&lt;i&gt;(.*?)&lt;\/i&gt;/gi, "<i>$1</i>");
+  html = html.replace(/&lt;u&gt;(.*?)&lt;\/u&gt;/gi, "<u>$1</u>");
+  html = html.replace(/&lt;s&gt;(.*?)&lt;\/s&gt;/gi, "<s>$1</s>");
+  html = html.replace(/&lt;color=(.*?)&gt;(.*?)&lt;\/color&gt;/gi, "<span style='color:$1'>$2</span>");
+  html = html.replace(/&lt;size=(.*?)&gt;(.*?)&lt;\/size&gt;/gi, "<span style='font-size:1.2em'>$2</span>");
+  html = html.replace(/\{([^}]+)\}/g, '<span style="color:#3b82f6;font-weight:bold;">[$1]</span>');
+  html = html.replace(/\n/g, "<br>");
+  return html;
+}
+
+
 function renderInspector() {
   const container = document.getElementById("inspectorContent");
-
-  const choicesEl = container.querySelector("#details-choices");
-  const choicesOpen = choicesEl ? choicesEl.hasAttribute("open") : true;
-
-  const execEl = container.querySelector("#details-exec");
-  const execOpen = execEl ? execEl.hasAttribute("open") : true;
-
-  const choiceOpenMap = {};
-  container
-    .querySelectorAll("[data-choice-open]")
-    .forEach(
-      (el) => (choiceOpenMap[el.getAttribute("data-choice-open")] = true),
-    );
-
   const frame = getFrame();
 
-  const iconExpanded = `
-    <svg class="icon-expanded" style="width:16px; height:16px; margin-right:5px;" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-      <path stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="m19 9-7 7-7-7"/>
-    </svg>`;
-
-  const iconCollapsed = `
-    <svg class="icon-collapsed" style="width:16px; height:16px; margin-right:5px;" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-      <path stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="m9 5 7 7-7 7"/>
-    </svg>`;
-
+  // Styles & Icons
   const styles = `
     <style>
-        details > summary {
-            list-style: none;
-            cursor: pointer;
-            font-weight: 600;
-            margin-bottom: 10px;
-            user-select: none;
-            display: flex;
-            align-items: center;
-            outline: none;
-        }
+        details > summary { list-style: none; cursor: pointer; font-weight: 600; margin-bottom: 10px; display: flex; align-items: center; outline: none; }
         details > summary::-webkit-details-marker { display: none; }
-
-
         details[open] .icon-collapsed { display: none; }
         details:not([open]) .icon-expanded { display: none; }
     </style>`;
+  const iconExpanded = `<svg class="icon-expanded" style="width:16px; height:16px; margin-right:5px;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m19 9-7 7-7-7"/></svg>`;
+  const iconCollapsed = `<svg class="icon-collapsed" style="width:16px; height:16px; margin-right:5px;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m9 5 7 7-7 7"/></svg>`;
 
   if (selectedSlotIndex === -1) {
-    const speakerOpts = project.characters
-      .map(
-        (c) =>
-          `<option value="${c.id}" ${frame.speakerId === c.id ? "selected" : ""}>${c.name}</option>`,
-      )
-      .join("");
-    const bgOpts = ["none", ...project.assets.backgrounds.map((b) => b.name)]
-      .map(
-        (n) =>
-          `<option value="${n}" ${frame.background === n ? "selected" : ""}>${n}</option>`,
-      )
-      .join("");
+    // --- Frame Inspector ---
+    const speakerOpts = project.characters.map(c => `<option value="${c.id}" ${frame.speakerId === c.id ? "selected" : ""}>${c.name}</option>`).join("");
+    const bgOpts = ["none", ...project.assets.backgrounds.map(b => b.name)].map(n => `<option value="${n}" ${frame.background === n ? "selected" : ""}>${n}</option>`).join("");
+    const langOpts = supportedLanguages.map(l => `<option value="${l}" ${editorLanguage === l ? "selected" : ""}>${l}</option>`).join("");
 
-    let instantControls = "";
-
-    const langOpts = supportedLanguages.map(l =>
-      `<option value="${l}" ${editorLanguage === l ? "selected" : ""}>${l}</option>`
-    ).join("");
-
+    // ดึง Text ปัจจุบันมาแสดงผลย่อๆ
     const currentText = getLocalizedFrameText(frame);
+    const textPreview = currentText.length > 50 ? currentText.substring(0, 50) + "..." : (currentText || "(No text)");
+
+    // จัดการ State ของ Details
+    const choicesEl = container.querySelector("#details-choices");
+    const choicesOpen = choicesEl ? choicesEl.hasAttribute("open") : true;
+    const execEl = container.querySelector("#details-exec");
+    const execOpen = execEl ? execEl.hasAttribute("open") : true;
+    const choiceOpenMap = {};
+    container.querySelectorAll("[data-choice-open]").forEach((el) => (choiceOpenMap[el.getAttribute("data-choice-open")] = true));
 
     container.innerHTML = `
       ${styles}
@@ -850,88 +1131,64 @@ function renderInspector() {
       <div class="form-group">
         <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 4px;">
             <label style="margin:0;">Dialogue Text</label>
-            <select style="width:auto; padding:2px 5px; font-size:11px;" onchange="changeEditorLanguage(this.value)">
-                ${langOpts}
-            </select>
+            <div style="display:flex; gap:5px; align-items:center;">
+                <select style="width:auto; padding:2px 5px; font-size:11px;" onchange="handleLanguageSelect(this)">
+                    ${langOpts}
+                    <option value="__ADD_NEW__" style="font-weight:bold; color:var(--primary);">+ Add New Language...</option>
+                </select>
+            </div>
         </div>
-        <textarea oninput="updateText(this.value)">${currentText}</textarea>
+        
+        <div style="border: 1px solid var(--border); border-radius: 6px; padding: 10px; background: var(--bg-secondary); cursor: pointer; transition: all 0.2s;" 
+             onclick="openTextEditor()"
+             title="Click to edit dialogue">
+            <div style="font-size: 11px; color: var(--text-muted); margin-bottom: 4px; display:flex; justify-content:space-between;">
+                <span>CONTENT (${editorLanguage})</span>
+                <span>✎ Edit</span>
+            </div>
+            <div style="font-size: 13px; color: var(--text-main); line-height: 1.4; max-height: 60px; overflow: hidden; pointer-events: none;">
+                ${textPreview.replace(/</g, "&lt;")}
+            </div>
+        </div>
       </div>
 
-      ${instantControls}
-
       <details id="details-choices" class="form-group" style="border-top:1px solid var(--border); margin-top:10px; padding-top:10px;" ${choicesOpen ? "open" : ""}>
-          <summary>
-            ${iconExpanded}
-            ${iconCollapsed}
-            Choices
-          </summary>
-          ${(frame.choices || [])
-        .map((c, i) => {
-          const type = c.type || "jump";
-          const targetLabel =
-            type === "jump"
-              ? "Target Frame (via Node Graph)"
-              : "Function Name";
-          const targetPlaceholder =
-            type === "jump" ? "Frame ID" : "myFunction()";
-
-          const isOpen = !!choiceOpenMap[String(i)];
-
-          return `
-              <details data-choice-open="${isOpen ? i : ""}" style="background: rgba(0,0,0,0.05); padding: 8px; border-radius: 4px; margin-bottom: 8px; border: 1px solid var(--border);" ${isOpen ? "open" : ""}>
-                  <summary style="list-style:none; cursor:pointer; user-select:none; display:flex; align-items:center; gap:6px; margin-bottom: 8px;">
-                    <span style="font-weight:700;">Choice ${i + 1}</span>
-                    <span style="font-size:11px; opacity:0.7; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${(c.text || "").replace(/</g, "&lt;").replace(/>/g, "&gt;")}</span>
-                  </summary>
-
+          <summary>${iconExpanded}${iconCollapsed}Choices</summary>
+          ${(frame.choices || []).map((c, i) => {
+      const type = c.type || "jump";
+      const isOpen = !!choiceOpenMap[String(i)];
+      const choiceTextVal = (typeof c.text === 'object' && c.text !== null) ? (c.text[editorLanguage] || "") : (c.text || "");
+      return `<details data-choice-open="${isOpen ? i : ""}" style="background: rgba(0,0,0,0.05); padding: 8px; border-radius: 4px; margin-bottom: 8px; border: 1px solid var(--border);" ${isOpen ? "open" : ""}>
+                  <summary style="font-size:12px; font-weight:700;">Choice ${i + 1}</summary>
                   <div style="margin-bottom: 4px;">
-                      <label style="font-size: 11px; opacity: 0.7;">Type</label>
-                      <select class="inspector-input" onchange="updateFrameChoice(${i}, 'type', this.value)" style="width: 100%; box-sizing: border-box;">
+                      <label style="font-size: 11px;">Type</label>
+                      <select class="inspector-input" onchange="updateFrameChoice(${i}, 'type', this.value)">
                           <option value="jump" ${type === "jump" ? "selected" : ""}>Jump Frame</option>
                           <option value="exec" ${type === "exec" ? "selected" : ""}>Execute Function</option>
                       </select>
                   </div>
                   <div style="margin-bottom: 4px;">
-                      <label style="font-size: 11px; opacity: 0.7;">Choice Text</label>
-                      <input class="inspector-input" type="text" value="${c.text}" onchange="updateFrameChoice(${i}, 'text', this.value)" style="width: 100%; box-sizing: border-box;">
+                      <label style="font-size: 11px;">Text (${editorLanguage})</label>
+                      <input class="inspector-input" type="text" value="${choiceTextVal}" oninput="updateFrameChoice(${i}, 'text', this.value)">
                   </div>
                   ${type === "jump"
-              ? `<div style="margin-bottom: 4px;">
-                          <label style="font-size: 11px; opacity: 0.7;">${targetLabel}</label>
-                          <button class="primary-btn small" type="button" onclick="openNodeGraphV2()" style="width: 100%;">
-                            Open Storyline Node Editor
-                          </button>
-                        </div>`
-              : `<div style="margin-bottom: 4px;">
-                          <label style="font-size: 11px; opacity: 0.7;">${targetLabel}</label>
-                          <input class="inspector-input" type="text" value="${c.target || ""}" onchange="updateFrameChoice(${i}, 'target', this.value)" style="width: 100%; box-sizing: border-box;" placeholder="${targetPlaceholder}">
-                        </div>`
-            }
+          ? `<div style="margin-bottom: 4px;"><label style="font-size: 11px;">Target</label><button class="primary-btn small" onclick="openNodeGraphV2()" style="width:100%">Open Graph</button></div>`
+          : `<div style="margin-bottom: 4px;"><label style="font-size: 11px;">Function</label><input class="inspector-input" type="text" value="${c.target || ""}" onchange="updateFrameChoice(${i}, 'target', this.value)" placeholder="func()"></div>`
+        }
                   <button class="danger small" onclick="removeFrameChoice(${i})" style="width: 100%; margin-top: 4px;">Remove</button>
               </details>`;
-        })
-        .join("")}
+    }).join("")}
           <button class="primary-btn small" onclick="addFrameChoice()" style="width: 100%;">+ Add Choice</button>
       </details>
 
       <details id="details-exec" class="form-group" style="border-top:1px solid var(--border); margin-top:10px; padding-top:10px;" ${execOpen ? "open" : ""}>
-          <summary>
-            ${iconExpanded}
-            ${iconCollapsed}
-            Execute Function
-          </summary>
-          ${(frame.executeFunctions || [])
-        .map(
-          (val, i) => `
-              <div style="background: rgba(0,0,0,0.05); padding: 8px; border-radius: 4px; margin-bottom: 8px; border: 1px solid var(--border);">
-                  <div style="margin-bottom: 4px;">
-                      <input class="inspector-input" type="text" value="${val}" oninput="updateExecuteFunction(${i}, this.value)" style="width: 100%; box-sizing: border-box;" placeholder="FunctionName()">
-                  </div>
-                  <button class="danger small" onclick="deleteExecuteFunction(${i})" style="width: 100%; margin-top: 4px;">Remove</button>
+          <summary>${iconExpanded}${iconCollapsed}Execute Function</summary>
+          ${(frame.executeFunctions || []).map((val, i) => `
+              <div style="margin-bottom: 4px; display:flex; gap:4px;">
+                  <input class="inspector-input" type="text" value="${val}" oninput="updateExecuteFunction(${i}, this.value)" placeholder="Func()">
+                  <button class="danger small" onclick="deleteExecuteFunction(${i})">X</button>
               </div>
-          `,
-        )
-        .join("")}
+          `).join("")}
           <button class="primary-btn small" onclick="addExecuteFunction()" style="width: 100%;">+ Add Function</button>
       </details>
 
@@ -940,39 +1197,27 @@ function renderInspector() {
         <select onchange="updateBackground(this.value)">${bgOpts}</select>
         <button class="primary-btn" onclick="openModal('assetsModal')" style="margin-top:5px;">Manage Assets</button>
       </div>
-
       <button class="danger" onclick="deleteFrame()" style="margin-top:20px;">Delete Slide</button>`;
     return;
   }
 
+  // --- Character Slot Inspector (คงเดิม) ---
   const slot = frame.slots[selectedSlotIndex];
   const char = project.characters.find((c) => c.id === slot.charId);
-  const bodyOpts = char.bodies
-    .map(
-      (b) =>
-        `<option value="${b.name}" ${slot.body === b.name ? "selected" : ""}>${b.name}</option>`,
-    )
-    .join("");
-  const faceOpts = [
-    '<option value="none">none</option>',
-    ...char.faces.map(
-      (f) =>
-        `<option value="${f.name}" ${slot.face === f.name ? "selected" : ""}>${f.name}</option>`,
-    ),
-  ].join("");
+  const bodyOpts = char.bodies.map(b => `<option value="${b.name}" ${slot.body === b.name ? "selected" : ""}>${b.name}</option>`).join("");
+  const faceOpts = ['<option value="none">none</option>', ...char.faces.map(f => `<option value="${f.name}" ${slot.face === f.name ? "selected" : ""}>${f.name}</option>`)].join("");
 
   container.innerHTML = `
       <div style="margin-bottom:15px;padding-bottom:10px;border-bottom:1px solid var(--border);"><strong>${char.name}</strong> (Slot ${selectedSlotIndex})</div>
-      <div class="form-group"><label>Body Sprite (Base Layer)</label><select onchange="updateSlotProp('body',this.value)">${bodyOpts}</select></div>
-      <div class="form-group"><label>Face Expression (Overlay Layer)</label><select onchange="updateSlotProp('face',this.value)">${faceOpts}</select></div>
+      <div class="form-group"><label>Body Sprite</label><select onchange="updateSlotProp('body',this.value)">${bodyOpts}</select></div>
+      <div class="form-group"><label>Face Expression</label><select onchange="updateSlotProp('face',this.value)">${faceOpts}</select></div>
       <div class="form-group" style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
         <div><label>Scale</label><input type="number" step="0.1" value="${slot.scale}" onchange="updateSlotProp('scale',this.value)"></div>
         <div><label>Z-Index</label><input type="number" step="1" value="${slot.zIndex}" onchange="updateSlotProp('zIndex',this.value)"></div>
-        <div><label>X Offset</label><input type="number" step="10" value="${slot.x}" onchange="updateSlotProp('x',this.value)"></div>
-        <div><label>Y Offset</label><input type="number" step="10" value="${slot.y}" onchange="updateSlotProp('y',this.value)"></div>
+        <div><label>X</label><input type="number" step="10" value="${slot.x}" onchange="updateSlotProp('x',this.value)"></div>
+        <div><label>Y</label><input type="number" step="10" value="${slot.y}" onchange="updateSlotProp('y',this.value)"></div>
       </div>
       <div class="form-group">
-        <label>Effects</label>
         <label class="primary-btn small" style="width:100%;justify-content:center;">
            <input type="checkbox" ${slot.mirror ? "checked" : ""} onchange="updateSlotProp('mirror', this.checked)"> Mirror (Flip X)
         </label>
@@ -1455,14 +1700,23 @@ async function importJSON(e) {
 
     if (imported.characters && imported.chapters) {
       project = imported;
-      if (!project.assets)
-        project.assets = {
-          backgrounds: [],
-        };
+      if (!project.assets) project.assets = { backgrounds: [] };
+
+      // --- START ADDITION: Import Languages ---
+      if (Array.isArray(project.languages)) {
+        supportedLanguages = project.languages;
+      } else {
+        // If loading old project without languages, init defaults
+        project.languages = ["EN", "TH", "JP", "CN", "KR"];
+        supportedLanguages = project.languages;
+      }
+      // --- END ADDITION ---
+
       activeChapterId = project.chapters[0].id;
       loadChapter(activeChapterId);
       renderCastPalette();
       scheduleAutoSave("import_project");
+      if (typeof showToast === "function") showToast("Project loaded", "success");
     } else alert("Invalid format");
   } catch (err) {
     console.error(err);

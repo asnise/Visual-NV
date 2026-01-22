@@ -19,28 +19,39 @@ function updatePreviewRatio() {
   }
 }
 
+// ในไฟล์ preview.js
+
 function typeWriter(element, htmlString) {
   if (typingTimer) clearTimeout(typingTimer);
-  element.innerHTML = "";
 
+  // เตรียมตัวแปรเก็บข้อความ
+  let currentHTML = "";
   let i = 0;
   const speed = 25;
 
   function type() {
     if (i < htmlString.length) {
+      // เช็คว่าเป็นจุดเริ่มต้นของ Tag HTML หรือไม่
       if (htmlString.charAt(i) === "<") {
         let tagEnd = htmlString.indexOf(">", i);
         if (tagEnd !== -1) {
-          element.innerHTML += htmlString.substring(i, tagEnd + 1);
+          // ถ้าเจอ Tag ให้เก็บทั้ง Tag ทีเดียวเลย (เช่น <br> หรือ <span>)
+          currentHTML += htmlString.substring(i, tagEnd + 1);
           i = tagEnd + 1;
         } else {
-          element.innerHTML += htmlString.charAt(i);
+          currentHTML += htmlString.charAt(i);
           i++;
         }
       } else {
-        element.innerHTML += htmlString.charAt(i);
+        // ถ้าเป็นตัวอักษรธรรมดา ให้เก็บทีละตัว
+        currentHTML += htmlString.charAt(i);
         i++;
       }
+
+      // --- จุดสำคัญที่แก้ไข ---
+      // ใช้วิธีทับค่าเก่าทั้งหมด (Overwrite) แทนการ += 
+      // เพื่อให้ Browser ไม่ปิด Tag มั่วซั่วระหว่างพิมพ์
+      element.innerHTML = currentHTML;
 
       element.scrollTop = element.scrollHeight;
       typingTimer = setTimeout(type, speed);
@@ -69,11 +80,21 @@ function renderPreviewFrame() {
   speakerEl.textContent = speaker ? speaker.name : "Narrator";
   speakerEl.style.color = speaker ? speaker.color : "#fff";
 
+  // --- เริ่มส่วนที่แก้ไข ---
   let text = getLocalizedFrameText(frame) || "";
-  text = text.replace(
-    /\{([^}]+)\}/g,
-    '<span style="color:#3b82f6;font-weight:bold;">[$1]</span>',
-  );
+
+  // เรียกใช้ unityToHtml (จาก main.js) เพื่อแปลง Tag สีและอื่นๆ
+  if (typeof unityToHtml === "function") {
+    text = unityToHtml(text);
+  } else {
+    // Fallback เผื่อกรณีไม่เจอ function
+    text = text.replace(/</g, "&lt;").replace(/>/g, "&gt;");
+    text = text.replace(
+      /\{([^}]+)\}/g,
+      '<span style="color:#3b82f6;font-weight:bold;">[$1]</span>',
+    );
+  }
+  // --- จบส่วนที่แก้ไข ---
 
   const textElement = document.getElementById("pText");
   typeWriter(textElement, text);
@@ -94,7 +115,15 @@ function renderPreviewFrame() {
     frame.choices.forEach((choice) => {
       const btn = document.createElement("div");
       btn.className = "p-choice-btn";
-      btn.textContent = choice.text;
+
+      let btnText = "";
+      if (typeof choice.text === "object" && choice.text !== null) {
+        btnText = choice.text[editorLanguage] || choice.text["EN"] || Object.values(choice.text)[0] || "";
+      } else {
+        btnText = choice.text;
+      }
+      btn.textContent = btnText;
+
       btn.onclick = (e) => {
         e.stopPropagation();
         handleChoiceClick(choice);
@@ -107,6 +136,7 @@ function renderPreviewFrame() {
     choiceContainer.classList.remove("dynamic-grid");
   }
 
+  // ... (โค้ดส่วนจัดการ Slots / ตัวละคร ที่เหลือคงเดิม) ...
   const newSlotCharIds = new Set();
   frame.slots.forEach((s) => {
     if (s && s.charId) newSlotCharIds.add(s.charId);
@@ -305,6 +335,34 @@ function openPreview() {
   } catch (e) {
     console.warn("Preview validation failed:", e);
   }
+
+  // --- START NEW CODE: Initialize Language Switcher ---
+  const langSelect = document.getElementById("previewLangSelect");
+  if (langSelect && typeof supportedLanguages !== "undefined") {
+    langSelect.innerHTML = "";
+    supportedLanguages.forEach((lang) => {
+      const opt = document.createElement("option");
+      opt.value = lang;
+      opt.textContent = lang;
+      if (lang === editorLanguage) opt.selected = true;
+      langSelect.appendChild(opt);
+    });
+
+    langSelect.onchange = (e) => {
+      // Update global language
+      editorLanguage = e.target.value;
+
+      // Update any specific logic that might rely on changeEditorLanguage from main.js
+      if (typeof changeEditorLanguage === "function") {
+        // This ensures the main editor UI also syncs if visible
+        // But we manually re-render preview to be instant
+      }
+
+      // Re-render the current frame immediately
+      renderPreviewFrame();
+    };
+  }
+  // --- END NEW CODE ---
 
   previewCurrentIndex = activeFrameIndex;
   lastMainFrameIndex = -1;
