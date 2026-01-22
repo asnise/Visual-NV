@@ -1,3 +1,4 @@
+
 let project = {
   assets: {
     backgrounds: [],
@@ -34,7 +35,7 @@ let project = {
       frames: [
         {
           id: 100,
-          text: "Welcome! Drag characters to the slots.",
+          text: { "EN": "Welcome! Drag characters to the slots.", "TH": "ยินดีต้อนรับ! ลากตัวละครไปยังช่องว่าง" },
           speakerId: "",
           background: "none",
           slots: [null, null, null, null],
@@ -46,6 +47,9 @@ let project = {
 
 const VN_LOCAL_PROJECT_KEY = "vnEditorProject_v1";
 const VN_LOCAL_PROJECT_VERSION = 1;
+
+let editorLanguage = "EN";
+const supportedLanguages = ["EN", "TH", "JP", "CN", "KR"];
 
 let __saveTimer = null;
 function scheduleAutoSave(reason = "") {
@@ -65,17 +69,18 @@ function scheduleAutoSave(reason = "") {
             activeFilmstripTab,
             stageView,
             editorState,
+            editorLanguage
           },
         },
       };
       localStorage.setItem(VN_LOCAL_PROJECT_KEY, JSON.stringify(payload));
-    } catch (e) {}
+    } catch (e) { }
   }, 200);
 }
 
 try {
   window.scheduleAutoSave = scheduleAutoSave;
-} catch (e) {}
+} catch (e) { }
 
 function tryRestoreFromLocalStorage() {
   try {
@@ -97,6 +102,8 @@ function tryRestoreFromLocalStorage() {
       selectedSlotIndex = ui.selectedSlotIndex;
     if (typeof ui.activeFilmstripTab === "string")
       activeFilmstripTab = ui.activeFilmstripTab;
+    if (typeof ui.editorLanguage === "string")
+      editorLanguage = ui.editorLanguage;
 
     if (ui.stageView && typeof ui.stageView === "object")
       stageView = { ...stageView, ...ui.stageView };
@@ -151,7 +158,19 @@ function getChapter() {
 
 function getFrame() {
   const ch = getChapter();
-  return ch ? ch.frames[activeFrameIndex] : null;
+  const f = ch ? ch.frames[activeFrameIndex] : null;
+  if (f) {
+    if (!Array.isArray(f.slots)) f.slots = [null, null, null, null, null];
+    while (f.slots.length < 5) f.slots.push(null);
+  }
+  return f;
+}
+
+function getLocalizedFrameText(frame) {
+  if (!frame) return "";
+  if (typeof frame.text === "string") return frame.text;
+  if (!frame.text) return "";
+  return frame.text[editorLanguage] || frame.text["EN"] || "";
 }
 
 function deepClone(obj) {
@@ -161,9 +180,9 @@ function deepClone(obj) {
 function createFrameFromTemplate(templateFrame) {
   const clone = deepClone(templateFrame);
   clone.id = Date.now() + Math.floor(Math.random() * 1000);
-  if (!Array.isArray(clone.slots)) clone.slots = [null, null, null, null];
-  clone.slots = clone.slots.slice(0, 4);
-  while (clone.slots.length < 4) clone.slots.push(null);
+  if (!Array.isArray(clone.slots)) clone.slots = [null, null, null, null, null];
+  clone.slots = clone.slots.slice(0, 5);
+  while (clone.slots.length < 5) clone.slots.push(null);
   clone.slots.forEach((s) => {
     if (s) s.anim = "none";
   });
@@ -173,6 +192,13 @@ function createFrameFromTemplate(templateFrame) {
   if (clone.frameType === "instant" && !clone.returnToFrame) {
     clone.returnToFrame = "end";
   }
+
+  if (typeof clone.text === 'string') {
+    clone.text = { "EN": clone.text };
+  } else if (!clone.text) {
+    clone.text = { "EN": "" };
+  }
+
   return clone;
 }
 
@@ -233,10 +259,10 @@ function addChapter() {
   project.chapters.push(newChapter);
   newChapter.frames.push({
     id: Date.now(),
-    text: "Chapter Start",
+    text: { "EN": "Chapter Start" },
     speakerId: "",
     background: "none",
-    slots: [null, null, null, null],
+    slots: [null, null, null, null, null],
   });
   renderChapterMgmt();
   loadChapter(id);
@@ -257,10 +283,10 @@ function newProject() {
         frames: [
           {
             id: Date.now() + 1,
-            text: "Start",
+            text: { "EN": "Start" },
             speakerId: "",
             background: "none",
-            slots: [null, null, null, null],
+            slots: [null, null, null, null, null],
           },
         ],
       },
@@ -288,11 +314,11 @@ function addFrame() {
   const template = chapter.frames.length
     ? chapter.frames[chapter.frames.length - 1]
     : {
-        text: "",
-        speakerId: "",
-        background: "none",
-        slots: [null, null, null, null],
-      };
+      text: { "EN": "" },
+      speakerId: "",
+      background: "none",
+      slots: [null, null, null, null, null],
+    };
   const newFrame = createFrameFromTemplate(template);
   newFrame.frameType = activeFilmstripTab;
   if (activeFilmstripTab === "instant") {
@@ -321,10 +347,23 @@ function updateSlotProp(key, val) {
 }
 
 function updateText(val) {
-  getFrame().text = val;
+  const frame = getFrame();
+  if (typeof frame.text !== 'object' || frame.text === null) {
+    frame.text = { "EN": frame.text || "" };
+  }
+  frame.text[editorLanguage] = val;
+
   renderStage();
   renderFilmstrip();
   scheduleAutoSave("update_text");
+}
+
+function changeEditorLanguage(lang) {
+  editorLanguage = lang;
+  renderInspector();
+  renderStage();
+  renderFilmstrip();
+  scheduleAutoSave("change_editor_language");
 }
 
 function updateFrameChoice(index, key, val) {
@@ -455,7 +494,7 @@ function clearSlot(index) {
 
 function addCharToSlot(index, charId) {
   const frame = getFrame();
-  for (let i = 0; i < 4; i++)
+  for (let i = 0; i < 5; i++)
     if (frame.slots[i]?.charId === charId) frame.slots[i] = null;
   const char = project.characters.find((c) => c.id === charId);
   const defaultBody = char?.bodies[0]?.name || "default";
@@ -584,14 +623,15 @@ function renderStage() {
     ? speaker.color
     : "#666";
 
-  let text = frame.text || "Click here to edit text...";
+  let text = getLocalizedFrameText(frame) || "Click here to edit text...";
+
   text = text.replace(
     /\{([^}]+)\}/g,
     '<span style="color:#3b82f6;font-weight:bold;">[$1]</span>',
   );
   document.getElementById("overlayText").innerHTML = text;
 
-  for (let i = 0; i < 4; i++) {
+  for (let i = 0; i < 5; i++) {
     const zone = document.querySelector(`.slot-zone[data-slot="${i}"]`);
     zone.innerHTML = "";
     const slot = frame.slots[i];
@@ -716,7 +756,7 @@ function renderFilmstrip() {
              oncontextmenu="onFrameContextMenu(event)">
       <div class="frame-num">${idx + 1}</div>
       <div class="thumb-preview">${dots}</div>
-      <div class="frame-caption">${f.text || "..."}</div>
+      <div class="frame-caption">${getLocalizedFrameText(f) || "..."}</div>
     </div>`;
     })
     .join("");
@@ -791,6 +831,12 @@ function renderInspector() {
 
     let instantControls = "";
 
+    const langOpts = supportedLanguages.map(l =>
+      `<option value="${l}" ${editorLanguage === l ? "selected" : ""}>${l}</option>`
+    ).join("");
+
+    const currentText = getLocalizedFrameText(frame);
+
     container.innerHTML = `
       ${styles}
       <div class="form-group">
@@ -801,7 +847,15 @@ function renderInspector() {
         <select onchange="updateSpeaker(this.value)"><option value="">(Narrator)</option>${speakerOpts}</select>
       </div>
 
-      <div class="form-group"><label>Dialogue Text</label><textarea oninput="updateText(this.value)">${frame.text || ""}</textarea></div>
+      <div class="form-group">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 4px;">
+            <label style="margin:0;">Dialogue Text</label>
+            <select style="width:auto; padding:2px 5px; font-size:11px;" onchange="changeEditorLanguage(this.value)">
+                ${langOpts}
+            </select>
+        </div>
+        <textarea oninput="updateText(this.value)">${currentText}</textarea>
+      </div>
 
       ${instantControls}
 
@@ -812,18 +866,18 @@ function renderInspector() {
             Choices
           </summary>
           ${(frame.choices || [])
-            .map((c, i) => {
-              const type = c.type || "jump";
-              const targetLabel =
-                type === "jump"
-                  ? "Target Frame (via Node Graph)"
-                  : "Function Name";
-              const targetPlaceholder =
-                type === "jump" ? "Frame ID" : "myFunction()";
+        .map((c, i) => {
+          const type = c.type || "jump";
+          const targetLabel =
+            type === "jump"
+              ? "Target Frame (via Node Graph)"
+              : "Function Name";
+          const targetPlaceholder =
+            type === "jump" ? "Frame ID" : "myFunction()";
 
-              const isOpen = !!choiceOpenMap[String(i)];
+          const isOpen = !!choiceOpenMap[String(i)];
 
-              return `
+          return `
               <details data-choice-open="${isOpen ? i : ""}" style="background: rgba(0,0,0,0.05); padding: 8px; border-radius: 4px; margin-bottom: 8px; border: 1px solid var(--border);" ${isOpen ? "open" : ""}>
                   <summary style="list-style:none; cursor:pointer; user-select:none; display:flex; align-items:center; gap:6px; margin-bottom: 8px;">
                     <span style="font-weight:700;">Choice ${i + 1}</span>
@@ -841,23 +895,22 @@ function renderInspector() {
                       <label style="font-size: 11px; opacity: 0.7;">Choice Text</label>
                       <input class="inspector-input" type="text" value="${c.text}" onchange="updateFrameChoice(${i}, 'text', this.value)" style="width: 100%; box-sizing: border-box;">
                   </div>
-                  ${
-                    type === "jump"
-                      ? `<div style="margin-bottom: 4px;">
+                  ${type === "jump"
+              ? `<div style="margin-bottom: 4px;">
                           <label style="font-size: 11px; opacity: 0.7;">${targetLabel}</label>
                           <button class="primary-btn small" type="button" onclick="openNodeGraphV2()" style="width: 100%;">
                             Open Storyline Node Editor
                           </button>
                         </div>`
-                      : `<div style="margin-bottom: 4px;">
+              : `<div style="margin-bottom: 4px;">
                           <label style="font-size: 11px; opacity: 0.7;">${targetLabel}</label>
                           <input class="inspector-input" type="text" value="${c.target || ""}" onchange="updateFrameChoice(${i}, 'target', this.value)" style="width: 100%; box-sizing: border-box;" placeholder="${targetPlaceholder}">
                         </div>`
-                  }
+            }
                   <button class="danger small" onclick="removeFrameChoice(${i})" style="width: 100%; margin-top: 4px;">Remove</button>
               </details>`;
-            })
-            .join("")}
+        })
+        .join("")}
           <button class="primary-btn small" onclick="addFrameChoice()" style="width: 100%;">+ Add Choice</button>
       </details>
 
@@ -868,8 +921,8 @@ function renderInspector() {
             Execute Function
           </summary>
           ${(frame.executeFunctions || [])
-            .map(
-              (val, i) => `
+        .map(
+          (val, i) => `
               <div style="background: rgba(0,0,0,0.05); padding: 8px; border-radius: 4px; margin-bottom: 8px; border: 1px solid var(--border);">
                   <div style="margin-bottom: 4px;">
                       <input class="inspector-input" type="text" value="${val}" oninput="updateExecuteFunction(${i}, this.value)" style="width: 100%; box-sizing: border-box;" placeholder="FunctionName()">
@@ -877,8 +930,8 @@ function renderInspector() {
                   <button class="danger small" onclick="deleteExecuteFunction(${i})" style="width: 100%; margin-top: 4px;">Remove</button>
               </div>
           `,
-            )
-            .join("")}
+        )
+        .join("")}
           <button class="primary-btn small" onclick="addExecuteFunction()" style="width: 100%;">+ Add Function</button>
       </details>
 
@@ -1229,7 +1282,7 @@ function onFrameDrop(e) {
   );
 }
 
-function onFrameDragEnd(e) {}
+function onFrameDragEnd(e) { }
 
 let contextFrameIndex = null;
 
@@ -1797,7 +1850,6 @@ function resetStageView() {
 
 init();
 
-// เพิ่ม Helper Functions สำหรับ Loading
 function showLoading(text = "Processing...") {
   const modal = document.getElementById("loadingModal");
   if (modal) {
@@ -1811,10 +1863,8 @@ function hideLoading() {
   if (modal) modal.classList.remove("visible");
 }
 
-// ฟังก์ชัน New Project
 function newProject() {
   if (confirm("Create a new project? Any unsaved changes will be lost.")) {
-    // รีเซ็ตค่า Project เป็นค่าเริ่มต้น
     project = {
       assets: { backgrounds: [] },
       characters: [],
@@ -1822,11 +1872,11 @@ function newProject() {
         {
           id: 1,
           title: "Episode 1",
-          startFrameId: null, // เพิ่ม startFrameId
+          startFrameId: null,
           frames: [
             {
               id: 100,
-              text: "Start here...",
+              text: { "EN": "Start here..." },
               speakerId: "",
               background: "none",
               slots: [null, null, null, null],
@@ -1836,12 +1886,10 @@ function newProject() {
       ],
     };
 
-    // รีเซ็ต UI State
     activeChapterId = 1;
     activeFrameIndex = 0;
     selectedSlotIndex = -1;
 
-    // โหลดหน้าจอใหม่
     loadChapter(1);
     showToast("New project created", "success");
     scheduleAutoSave("new_project");

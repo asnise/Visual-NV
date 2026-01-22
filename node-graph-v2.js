@@ -821,7 +821,7 @@
   .ngv2-badge.end { border-color: rgba(239,68,68,0.5); background: rgba(239,68,68,0.08); }
 .ngv2-badge.instant { border-color: rgba(245,158,11,0.5); background: rgba(245,158,11,0.12); }
 
-.ngv2-nodeBody { padding: ${CFG.node.pad}px; display:flex; flex-direction: column; gap: 8px; background: ${CFG.colors.bg}; border-radius: var(--radius-xl);}
+.ngv2-nodeBody { padding: ${CFG.node.pad}px; display:flex; flex-direction: column; gap: 8px; background: ${CFG.colors.bg}; border-radius: 0 0 var(--radius-xl) var(--radius-xl);}
 
 
 .ngv2-portsGrid{

@@ -1,3 +1,4 @@
+
 let previewCurrentIndex = 0;
 let previousCharRects = new Map();
 let typingTimer = null;
@@ -68,7 +69,7 @@ function renderPreviewFrame() {
   speakerEl.textContent = speaker ? speaker.name : "Narrator";
   speakerEl.style.color = speaker ? speaker.color : "#fff";
 
-  let text = frame.text || "";
+  let text = getLocalizedFrameText(frame) || "";
   text = text.replace(
     /\{([^}]+)\}/g,
     '<span style="color:#3b82f6;font-weight:bold;">[$1]</span>',
@@ -78,7 +79,7 @@ function renderPreviewFrame() {
   typeWriter(textElement, text);
 
   const dialogueLayer = document.querySelector(".p-dialogue-layer");
-  dialogueLayer.classList.toggle("visible", !!frame.text);
+  dialogueLayer.classList.toggle("visible", !!text);
 
   const choiceContainer = document.getElementById("pChoiceContainer");
   choiceContainer.innerHTML = "";
@@ -143,7 +144,7 @@ function renderPreviewFrame() {
     }
   });
 
-  for (let i = 0; i < 4; i++) {
+  for (let i = 0; i < 5; i++) {
     const slotEl = document.getElementById(`pSlot${i}`);
     slotEl.innerHTML = "";
     const slot = frame.slots[i];
@@ -240,7 +241,6 @@ function renderPreviewFrame() {
 }
 
 function openPreview() {
-  // Validate Start/End from node graph storage before opening
   try {
     const ch = getChapter();
     const g = ch ? ch.graphV2 || ch["graphV2"] : null;
@@ -251,7 +251,6 @@ function openPreview() {
       return;
     }
 
-    // Build node id map to test reachability
     const nodes = Array.isArray(g.nodes) ? g.nodes : [];
     const links = Array.isArray(g.links) ? g.links : [];
     const nodeById = new Map(nodes.map((n) => [String(n.id), n]));
@@ -277,7 +276,6 @@ function openPreview() {
       adj.get(a).add(b);
     }
 
-    // BFS
     const q = [String(startNode.id)];
     const seen = new Set(q);
     let found = false;

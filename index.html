@@ -1,644 +1,490 @@
 <!doctype html>
 <html lang="en">
-    <head>
-        <meta charset="UTF-8" />
-        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-        <title>Visual VN Editor</title>
-        <link rel="preconnect" href="https://fonts.googleapis.com" />
-        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-        <link
-            href="https://fonts.googleapis.com/css2?family=Sarabun:ital,wght@0,100;0,200;0,300;0,400;0,500;0,600;0,700;0,800;1,100;1,200;1,300;1,400;1,500;1,600;1,700;1,800&display=swap"
-            rel="stylesheet"
-        />
 
-        <link rel="stylesheet" href="style.css" />
-    </head>
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Visual VN Editor</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+        href="https://fonts.googleapis.com/css2?family=Sarabun:ital,wght@0,100;0,200;0,300;0,400;0,500;0,600;0,700;0,800;1,100;1,200;1,300;1,400;1,500;1,600;1,700;1,800&display=swap"
+        rel="stylesheet" />
 
-    <body>
-        <header>
-            <nav class="menu-bar">
-                <div class="menu-item">
-                    File
-                    <div class="dropdown-content">
-                        <button onclick="newProject()">New Project</button>
-                        <button
-                            onclick="
+    <link rel="stylesheet" href="style.css" />
+</head>
+
+<body>
+    <header>
+        <nav class="menu-bar">
+            <div class="menu-item">
+                File
+                <div class="dropdown-content">
+                    <button onclick="newProject()">New Project</button>
+                    <button onclick="
                                 document.getElementById('importInput').click()
-                            "
-                        >
-                            Open Project...
-                        </button>
-                        <button onclick="exportJSON()">Export Project</button>
-                        <button onclick="saveJSON()">Save Project</button>
-                        <input
-                            type="file"
-                            id="importInput"
-                            style="display: none"
-                            accept=".json,.vns"
-                            onchange="importJSON(event)"
-                        />
-                    </div>
+                            ">
+                        Open Project...
+                    </button>
+                    <button onclick="exportJSON()">Export Project</button>
+                    <button onclick="saveJSON()">Save Project</button>
+                    <input type="file" id="importInput" style="display: none" accept=".json,.vns"
+                        onchange="importJSON(event)" />
                 </div>
+            </div>
 
-                <div class="menu-item">
-                    Edit
-                    <div class="dropdown-content">
-                        <button onclick="addFrame()">Add New Frame</button>
-                        <button onclick="deleteFrame()">Delete Frame</button>
-                        <hr />
-                        <button onclick="openModal('chapterModal')">
-                            Chapter Manager
-                        </button>
-                        <button onclick="openModal('assetsModal')">
-                            Background Assets
-                        </button>
-                        <hr />
-                        <button onclick="openSettingsModal()">Settings</button>
-                    </div>
+            <div class="menu-item">
+                Edit
+                <div class="dropdown-content">
+                    <button onclick="addFrame()">Add New Frame</button>
+                    <button onclick="deleteFrame()">Delete Frame</button>
+                    <hr />
+                    <button onclick="openModal('chapterModal')">
+                        Chapter Manager
+                    </button>
+                    <button onclick="openModal('assetsModal')">
+                        Background Assets
+                    </button>
+                    <hr />
+                    <button onclick="openSettingsModal()">Settings</button>
                 </div>
+            </div>
 
-                <div class="menu-item">
-                    Component
-                    <div class="dropdown-content">
-                        <button onclick="addCharacter()">
-                            Quick Add Character
-                        </button>
-                        <button onclick="openModal('characterModal')">
-                            Character Manager
-                        </button>
-                    </div>
+            <div class="menu-item">
+                Component
+                <div class="dropdown-content">
+                    <button onclick="addCharacter()">
+                        Quick Add Character
+                    </button>
+                    <button onclick="openModal('characterModal')">
+                        Character Manager
+                    </button>
                 </div>
+            </div>
 
-                <div class="menu-item">
-                    Window
-                    <div class="dropdown-content">
-                        <button onclick="openPreview()">Preview Player</button>
-                        <button onclick="openNodeGraphV2()">
-                            Storyline Node Editor
-                        </button>
-                    </div>
+            <div class="menu-item">
+                Window
+                <div class="dropdown-content">
+                    <button onclick="openPreview()">Preview Player</button>
+                    <button onclick="openNodeGraphV2()">
+                        Storyline Node Editor
+                    </button>
                 </div>
+            </div>
 
-                <div class="menu-item">
-                    Help
-                    <div class="dropdown-content">
-                        <button onclick="alert('Visual VN Editor v1.5')">
-                            About
-                        </button>
-                        <button
-                            onclick="window.open('Document.html', '_blank')"
-                        >
-                            Documentation
-                        </button>
-                    </div>
+            <div class="menu-item">
+                Help
+                <div class="dropdown-content">
+                    <button onclick="alert('Visual VN Editor v1.5')">
+                        About
+                    </button>
+                    <button onclick="window.open('Document.html', '_blank')">
+                        Documentation
+                    </button>
                 </div>
-            </nav>
+            </div>
+        </nav>
 
-            <div class="actions">
-                <button class="primary-btn" onclick="openPreview()">
-                    <span style="margin-right: 5px">▶</span> Play Preview
+        <div class="actions">
+            <button class="primary-btn" onclick="openPreview()">
+                <span style="margin-right: 5px">▶</span> Play Preview
+            </button>
+        </div>
+    </header>
+
+    <div class="workspace">
+        <div class="sidebar">
+            <div class="panel-header">
+                <span>Cast Palette</span>
+                <small>Drag to stage</small>
+            </div>
+            <div id="castList" class="cast-grid"></div>
+            <div style="padding: 10px; text-align: center">
+                <button class="primary-btn" onclick="addCharacter()">
+                    + New Character
                 </button>
             </div>
-        </header>
+        </div>
 
-        <div class="workspace">
-            <div class="sidebar">
-                <div class="panel-header">
-                    <span>Cast Palette</span>
-                    <small>Drag to stage</small>
-                </div>
-                <div id="castList" class="cast-grid"></div>
-                <div style="padding: 10px; text-align: center">
-                    <button class="primary-btn" onclick="addCharacter()">
-                        + New Character
-                    </button>
-                </div>
-            </div>
+        <div class="stage-area">
+            <div class="stage-wrapper" id="stageWrapper">
+                <div id="visualStage" class="visual-stage">
+                    <div class="slot-zone" data-slot="0" ondrop="drop(event)" ondragover="allowDrop(event)"
+                        ondragleave="handleDragLeave(event)"></div>
+                    <div class="slot-zone" data-slot="1" ondrop="drop(event)" ondragover="allowDrop(event)"
+                        ondragleave="handleDragLeave(event)"></div>
+                    <div class="slot-zone" data-slot="2" ondrop="drop(event)" ondragover="allowDrop(event)"
+                        ondragleave="handleDragLeave(event)"></div>
+                    <div class="slot-zone" data-slot="3" ondrop="drop(event)" ondragover="allowDrop(event)"
+                        ondragleave="handleDragLeave(event)"></div>
+                    <div class="slot-zone" data-slot="4" ondrop="drop(event)" ondragover="allowDrop(event)"
+                        ondragleave="handleDragLeave(event)"></div>
 
-            <div class="stage-area">
-                <div class="stage-wrapper" id="stageWrapper">
-                    <div id="visualStage" class="visual-stage">
-                        <div
-                            class="slot-zone"
-                            data-slot="0"
-                            ondrop="drop(event)"
-                            ondragover="allowDrop(event)"
-                            ondragleave="handleDragLeave(event)"
-                        ></div>
-                        <div
-                            class="slot-zone"
-                            data-slot="1"
-                            ondrop="drop(event)"
-                            ondragover="allowDrop(event)"
-                            ondragleave="handleDragLeave(event)"
-                        ></div>
-                        <div
-                            class="slot-zone"
-                            data-slot="2"
-                            ondrop="drop(event)"
-                            ondragover="allowDrop(event)"
-                            ondragleave="handleDragLeave(event)"
-                        ></div>
-                        <div
-                            class="slot-zone"
-                            data-slot="3"
-                            ondrop="drop(event)"
-                            ondragover="allowDrop(event)"
-                            ondragleave="handleDragLeave(event)"
-                        ></div>
-
-                        <div
-                            class="stage-dialogue-box"
-                            id="dialogueBox"
-                            onclick="selectSlot(-1)"
-                        >
-                            <div class="d-speaker" id="overlaySpeaker">
-                                Speaker
-                            </div>
-                            <div class="d-text" id="overlayText">
-                                Dialogue text...
-                            </div>
+                    <div class="stage-dialogue-box" id="dialogueBox" onclick="selectSlot(-1)">
+                        <div class="d-speaker" id="overlaySpeaker">
+                            Speaker
+                        </div>
+                        <div class="d-text" id="overlayText">
+                            Dialogue text...
                         </div>
                     </div>
-
-                    <div class="stage-controls">
-                        <button
-                            class="icon-btn"
-                            onclick="resetStageView()"
-                            title="Reset View"
-                        >
-                            <span style="font-size: 14px">⟲</span>
-                        </button>
-                        <span id="stageZoomLabel">100%</span>
-                    </div>
                 </div>
 
-                <div class="filmstrip-panel">
-                    <div class="filmstrip-tabs">
-                        <button
-                            class="filmstrip-tab active"
-                            data-tab="main"
-                            onclick="switchFilmstripTab('main')"
-                        >
-                            Main Timeline
-                        </button>
-                        <button
-                            class="filmstrip-tab"
-                            data-tab="instant"
-                            onclick="switchFilmstripTab('instant')"
-                        >
-                            Instant Frame
-                        </button>
-                    </div>
-                    <div id="filmstrip" class="filmstrip-reel"></div>
+                <div class="stage-controls">
+                    <button class="icon-btn" onclick="resetStageView()" title="Reset View">
+                        <span style="font-size: 14px">⟲</span>
+                    </button>
+                    <span id="stageZoomLabel">100%</span>
                 </div>
             </div>
 
-            <div class="inspector">
-                <div class="panel-header">Properties</div>
-                <div id="inspectorContent" class="inspector-content"></div>
+            <div class="filmstrip-panel">
+                <div class="filmstrip-tabs">
+                    <button class="filmstrip-tab active" data-tab="main" onclick="switchFilmstripTab('main')">
+                        Main Timeline
+                    </button>
+                    <button class="filmstrip-tab" data-tab="instant" onclick="switchFilmstripTab('instant')">
+                        Instant Frame
+                    </button>
+                </div>
+                <div id="filmstrip" class="filmstrip-reel"></div>
             </div>
         </div>
 
-        <div id="loadingModal" class="loading-modal">
-            <div class="spinner"></div>
-            <div id="loadingText">Processing...</div>
+        <div class="resizer-handle" id="inspectorResizer"></div>
+        <div class="inspector">
+            <div class="panel-header">Properties</div>
+            <div id="inspectorContent" class="inspector-content"></div>
         </div>
+    </div>
 
-        <div id="characterModal" class="modal-overlay">
-            <div class="modal-box large-modal">
-                <div class="modal-header">
-                    <h3>Character Setup & Layers</h3>
-                    <button onclick="closeModal('characterModal')">
-                        &times;
-                    </button>
-                </div>
-                <div class="modal-body">
-                    <div class="char-editor-layout">
-                        <div class="char-list-pane" id="charListPane"></div>
-                        <div class="char-edit-pane" id="charEditPane"></div>
-                    </div>
+    <div id="loadingModal" class="loading-modal">
+        <div class="spinner"></div>
+        <div id="loadingText">Processing...</div>
+    </div>
+
+    <div id="characterModal" class="modal-overlay">
+        <div class="modal-box large-modal">
+            <div class="modal-header">
+                <h3>Character Setup & Layers</h3>
+                <button onclick="closeModal('characterModal')">
+                    &times;
+                </button>
+            </div>
+            <div class="modal-body">
+                <div class="char-editor-layout">
+                    <div class="char-list-pane" id="charListPane"></div>
+                    <div class="char-edit-pane" id="charEditPane"></div>
                 </div>
             </div>
         </div>
+    </div>
 
-        <div id="chapterModal" class="modal-overlay">
-            <div class="modal-box">
-                <div class="modal-header">
-                    <h3>Manage Chapters</h3>
-                    <button onclick="closeModal('chapterModal')">
-                        &times;
-                    </button>
-                </div>
-                <div class="modal-body" id="chapterMgmtList"></div>
-                <div class="modal-footer">
-                    <button class="primary-btn" onclick="addChapter()">
-                        + New Chapter
-                    </button>
-                </div>
+    <div id="chapterModal" class="modal-overlay">
+        <div class="modal-box">
+            <div class="modal-header">
+                <h3>Manage Chapters</h3>
+                <button onclick="closeModal('chapterModal')">
+                    &times;
+                </button>
+            </div>
+            <div class="modal-body" id="chapterMgmtList"></div>
+            <div class="modal-footer">
+                <button class="primary-btn" onclick="addChapter()">
+                    + New Chapter
+                </button>
             </div>
         </div>
+    </div>
 
-        <div id="assetsModal" class="modal-overlay">
-            <div class="modal-box">
-                <div class="modal-header">
-                    <h3>Background Assets</h3>
-                    <button onclick="closeModal('assetsModal')">&times;</button>
-                </div>
-                <div class="modal-body">
-                    <button
-                        class="primary-btn"
-                        onclick="document.getElementById('bgFileInput').click()"
-                    >
-                        Upload New Background
-                    </button>
-                    <input
-                        type="file"
-                        id="bgFileInput"
-                        style="display: none"
-                        accept="image/*"
-                    />
-                    <div
-                        id="assetList"
-                        style="
+    <div id="assetsModal" class="modal-overlay">
+        <div class="modal-box">
+            <div class="modal-header">
+                <h3>Background Assets</h3>
+                <button onclick="closeModal('assetsModal')">&times;</button>
+            </div>
+            <div class="modal-body">
+                <button class="primary-btn" onclick="document.getElementById('bgFileInput').click()">
+                    Upload New Background
+                </button>
+                <input type="file" id="bgFileInput" style="display: none" accept="image/*" />
+                <div id="assetList" style="
                             display: flex;
                             flex-direction: column;
                             gap: 10px;
                             margin-top: 15px;
-                        "
-                    ></div>
-                </div>
+                        "></div>
             </div>
         </div>
+    </div>
 
-        <div id="settingsModal" class="modal-overlay">
-            <div class="modal-box" style="width: 800px; max-width: 90vw">
-                <div class="modal-header">
-                    <h3>Settings</h3>
-                    <button onclick="cancelSettings()">&times;</button>
-                </div>
+    <div id="settingsModal" class="modal-overlay">
+        <div class="modal-box" style="width: 800px; max-width: 90vw">
+            <div class="modal-header">
+                <h3>Settings</h3>
+                <button onclick="cancelSettings()">&times;</button>
+            </div>
 
-                <div class="modal-body" style="padding: 0">
-                    <div class="settings-layout">
-                        <div class="settings-sidebar">
-                            <div
-                                class="settings-nav-item active"
-                                data-tab="general"
-                            >
-                                General
+            <div class="modal-body" style="padding: 0">
+                <div class="settings-layout">
+                    <div class="settings-sidebar">
+                        <div class="settings-nav-item active" data-tab="general">
+                            General
+                        </div>
+                        <div class="settings-nav-item" data-tab="system">
+                            System
+                        </div>
+                    </div>
+
+                    <div class="settings-content">
+                        <div id="settings-general" class="settings-panel active">
+                            <div class="settings-group">
+                                <h4>Appearance</h4>
+                                <div class="setting-row">
+                                    <label>Theme</label>
+                                    <select id="settingTheme">
+                                        <option value="light">Light</option>
+                                        <option value="dark">Dark</option>
+                                    </select>
+                                </div>
+                                <div class="setting-row">
+                                    <label>UI Scale</label>
+                                    <select id="settingUIScale">
+                                        <option value="0.8">
+                                            Small (80%)
+                                        </option>
+                                        <option value="1">
+                                            Normal (100%)
+                                        </option>
+                                        <option value="1.2">
+                                            Large (120%)
+                                        </option>
+                                    </select>
+                                </div>
                             </div>
-                            <div class="settings-nav-item" data-tab="system">
-                                System
+                            <div class="settings-group">
+                                <h4>Workspace</h4>
+                                <div class="setting-row">
+                                    <label>Stage Background</label>
+                                    <select id="settingStageBackground">
+                                        <option value="white">White</option>
+                                        <option value="black">Black</option>
+                                    </select>
+                                </div>
                             </div>
                         </div>
 
-                        <div class="settings-content">
-                            <div
-                                id="settings-general"
-                                class="settings-panel active"
-                            >
-                                <div class="settings-group">
-                                    <h4>Appearance</h4>
-                                    <div class="setting-row">
-                                        <label>Theme</label>
-                                        <select id="settingTheme">
-                                            <option value="light">Light</option>
-                                            <option value="dark">Dark</option>
-                                        </select>
-                                    </div>
-                                    <div class="setting-row">
-                                        <label>UI Scale</label>
-                                        <select id="settingUIScale">
-                                            <option value="0.8">
-                                                Small (80%)
-                                            </option>
-                                            <option value="1">
-                                                Normal (100%)
-                                            </option>
-                                            <option value="1.2">
-                                                Large (120%)
-                                            </option>
-                                        </select>
-                                    </div>
+                        <div id="settings-system" class="settings-panel">
+                            <div class="settings-group">
+                                <h4>Performance</h4>
+                                <div class="setting-row">
+                                    <label>Hardware Acceleration</label>
+                                    <input type="checkbox" id="settingHWAccel" />
                                 </div>
-                                <div class="settings-group">
-                                    <h4>Workspace</h4>
-                                    <div class="setting-row">
-                                        <label>Stage Background</label>
-                                        <select id="settingStageBackground">
-                                            <option value="white">White</option>
-                                            <option value="black">Black</option>
-                                        </select>
-                                    </div>
+                                <div class="setting-row">
+                                    <label>Enable Transitions</label>
+                                    <input type="checkbox" id="settingTransitions" />
                                 </div>
                             </div>
 
-                            <div id="settings-system" class="settings-panel">
-                                <div class="settings-group">
-                                    <h4>Performance</h4>
-                                    <div class="setting-row">
-                                        <label>Hardware Acceleration</label>
-                                        <input
-                                            type="checkbox"
-                                            id="settingHWAccel"
-                                        />
-                                    </div>
-                                    <div class="setting-row">
-                                        <label>Enable Transitions</label>
-                                        <input
-                                            type="checkbox"
-                                            id="settingTransitions"
-                                        />
-                                    </div>
-                                </div>
-
-                                <div class="settings-group">
-                                    <h4>Danger Zone</h4>
-                                    <button
-                                        class="danger"
-                                        style="width: 100%"
-                                        onclick="resetSettings()"
-                                    >
-                                        Reset Settings to Default
-                                    </button>
-                                </div>
+                            <div class="settings-group">
+                                <h4>Danger Zone</h4>
+                                <button class="danger" style="width: 100%" onclick="resetSettings()">
+                                    Reset Settings to Default
+                                </button>
                             </div>
                         </div>
                     </div>
                 </div>
-                <div class="modal-footer">
-                    <button
-                        class="danger"
-                        onclick="cancelSettings()"
-                        style="margin-right: 15px"
-                    >
-                        Cancel
-                    </button>
-                    <button
-                        class="primary-btn"
-                        onclick="saveAndApplySettings()"
-                    >
-                        Save Changes
-                    </button>
-                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="danger" onclick="cancelSettings()" style="margin-right: 15px">
+                    Cancel
+                </button>
+                <button class="primary-btn" onclick="saveAndApplySettings()">
+                    Save Changes
+                </button>
             </div>
         </div>
+    </div>
 
-        <div id="previewModal" class="modal-overlay">
-            <div class="modal-box large-modal">
-                <div class="modal-header">
-                    <h3>Preview Player</h3>
-                    <button onclick="closeModal('previewModal')">
-                        &times;
-                    </button>
-                </div>
-                <div
-                    class="preview-viewport"
-                    id="pViewport"
-                    style="position: relative; aspect-ratio: 16/9"
-                >
-                    <div
-                        class="nav-zone-right"
-                        onclick="
+    <div id="previewModal" class="modal-overlay">
+        <div class="modal-box large-modal">
+            <div class="modal-header">
+                <h3>Preview Player</h3>
+                <button onclick="closeModal('previewModal')">
+                    &times;
+                </button>
+            </div>
+            <div class="preview-viewport" id="pViewport" style="position: relative; aspect-ratio: 16/9">
+                <div class="nav-zone-right" onclick="
                             if (
                                 !document
                                     .getElementById('pChoiceContainer')
                                     ?.classList.contains('visible')
                             )
                                 nextPreview();
-                        "
-                        style="
+                        " style="
                             position: absolute;
                             top: 0;
                             right: 0;
                             width: 50%;
                             height: 100%;
                             z-index: 100;
-                        "
-                        title="Next Frame"
-                    ></div>
+                        " title="Next Frame"></div>
 
-                    <div class="p-slot" id="pSlot0"></div>
-                    <div class="p-slot" id="pSlot1"></div>
-                    <div class="p-slot" id="pSlot2"></div>
-                    <div class="p-slot" id="pSlot3"></div>
+                <div class="p-slot" id="pSlot0"></div>
+                <div class="p-slot" id="pSlot1"></div>
+                <div class="p-slot" id="pSlot2"></div>
+                <div class="p-slot" id="pSlot3"></div>
+                <div class="p-slot" id="pSlot4"></div>
 
-                    <div class="p-dialogue-layer">
-                        <div class="p-namebox" id="pSpeaker"></div>
-                        <div class="p-textbox" id="pText"></div>
-                    </div>
-
-                    <div class="p-choice-container" id="pChoiceContainer"></div>
+                <div class="p-dialogue-layer">
+                    <div class="p-namebox" id="pSpeaker"></div>
+                    <div class="p-textbox" id="pText"></div>
                 </div>
+
+                <div class="p-choice-container" id="pChoiceContainer"></div>
             </div>
         </div>
+    </div>
 
-        <div id="overlayModal" class="modal-overlay">
-            <div
-                class="modal-box"
-                style="
+    <div id="overlayModal" class="modal-overlay">
+        <div class="modal-box" style="
                     width: 90vw;
                     height: 85vh;
                     flex-direction: row;
                     overflow: hidden;
                     max-width: 1200px;
                     max-height: 900px;
-                "
-            >
-                <div
-                    style="
+                ">
+            <div style="
                         flex: 1;
                         display: flex;
                         flex-direction: column;
                         background: #2a2a2a;
                         position: relative;
                         overflow: hidden;
-                    "
-                >
-                    <div class="editor-toolbar">
-                        <span
-                            style="
+                    ">
+                <div class="editor-toolbar">
+                    <span style="
                                 color: #aaa;
                                 font-size: 12px;
                                 font-weight: 500;
-                            "
-                            >Graphic Editor</span
-                        >
-                        <div style="flex: 1"></div>
-                        <span
-                            style="
+                            ">Graphic Editor</span>
+                    <div style="flex: 1"></div>
+                    <span style="
                                 color: #888;
                                 font-size: 11px;
                                 margin-right: 15px;
-                            "
-                            >Mouse Wheel to Zoom • Middle-click drag to
-                            Pan</span
-                        >
-                        <span
-                            id="zoomLabel"
-                            style="
+                            ">Mouse Wheel to Zoom • Middle-click drag to
+                        Pan</span>
+                    <span id="zoomLabel" style="
                                 color: #fff;
                                 font-size: 12px;
                                 font-family: monospace;
-                            "
-                            >100%</span
-                        >
-                    </div>
-                    <div
-                        id="overlayEditorContainer"
-                        class="overlay-editor-container"
-                    >
-                        <div id="overlayCanvas" class="overlay-canvas">
-                            <img id="overlayBaseImg" class="overlay-base" />
-                            <div
-                                id="overlayTargetWrapper"
-                                class="overlay-target-wrapper"
-                            >
-                                <img
-                                    id="overlayTargetImg"
-                                    class="overlay-target-img"
-                                    draggable="false"
-                                />
-                                <div
-                                    class="resize-handle nw"
-                                    data-handle="nw"
-                                ></div>
-                                <div
-                                    class="resize-handle ne"
-                                    data-handle="ne"
-                                ></div>
-                                <div
-                                    class="resize-handle sw"
-                                    data-handle="sw"
-                                ></div>
-                                <div
-                                    class="resize-handle se"
-                                    data-handle="se"
-                                ></div>
-                            </div>
-                        </div>
-                    </div>
+                            ">100%</span>
                 </div>
-
-                <div class="overlay-props-panel">
-                    <div class="modal-header" style="padding: 15px">
-                        <h3 style="font-size: 14px; margin: 0">Properties</h3>
-                        <button onclick="closeModal('overlayModal')">
-                            &times;
-                        </button>
-                    </div>
-                    <div style="padding: 15px; flex: 1; overflow-y: auto">
-                        <div class="form-group">
-                            <label>Pos X (%)</label>
-                            <input
-                                type="number"
-                                id="propX"
-                                step="0.1"
-                                oninput="updateOverlayFromProps()"
-                            />
+                <div id="overlayEditorContainer" class="overlay-editor-container">
+                    <div id="overlayCanvas" class="overlay-canvas">
+                        <img id="overlayBaseImg" class="overlay-base" />
+                        <div id="overlayTargetWrapper" class="overlay-target-wrapper">
+                            <img id="overlayTargetImg" class="overlay-target-img" draggable="false" />
+                            <div class="resize-handle nw" data-handle="nw"></div>
+                            <div class="resize-handle ne" data-handle="ne"></div>
+                            <div class="resize-handle sw" data-handle="sw"></div>
+                            <div class="resize-handle se" data-handle="se"></div>
                         </div>
-                        <div class="form-group">
-                            <label>Pos Y (%)</label>
-                            <input
-                                type="number"
-                                id="propY"
-                                step="0.1"
-                                oninput="updateOverlayFromProps()"
-                            />
-                        </div>
-                        <div class="form-group">
-                            <label>Scale (Factor)</label>
-                            <input
-                                type="number"
-                                id="propScale"
-                                step="0.01"
-                                min="0.1"
-                                oninput="updateOverlayFromProps()"
-                            />
-                        </div>
-                        <hr
-                            style="
-                                border: 0;
-                                border-top: 1px solid #eee;
-                                margin: 20px 0;
-                            "
-                        />
-                        <p
-                            style="
-                                font-size: 11px;
-                                color: #666;
-                                line-height: 1.4;
-                            "
-                        >
-                            Use the handles to resize.<br />
-                            Drag to move.<br />
-                            Values are relative to the base image size.
-                        </p>
-                    </div>
-                    <div class="modal-footer">
-                        <button
-                            class="primary-btn"
-                            style="width: 100%"
-                            onclick="saveOverlayPosition()"
-                        >
-                            Apply & Save
-                        </button>
                     </div>
                 </div>
             </div>
-        </div>
 
-        <div id="addCharModal" class="modal-overlay">
-            <div class="modal-box">
-                <div class="modal-header">
-                    <h3>Add New Character</h3>
-                    <button onclick="closeModal('addCharModal')">
+            <div class="overlay-props-panel">
+                <div class="modal-header" style="padding: 15px">
+                    <h3 style="font-size: 14px; margin: 0">Properties</h3>
+                    <button onclick="closeModal('overlayModal')">
                         &times;
                     </button>
                 </div>
-                <div class="modal-body">
+                <div style="padding: 15px; flex: 1; overflow-y: auto">
                     <div class="form-group">
-                        <label>Name</label>
-                        <input
-                            type="text"
-                            id="newCharName"
-                            placeholder="Character Name"
-                        />
+                        <label>Pos X (%)</label>
+                        <input type="number" id="propX" step="0.1" oninput="updateOverlayFromProps()" />
                     </div>
                     <div class="form-group">
-                        <label>Main Sprite (Optional)</label>
-                        <input
-                            type="file"
-                            id="newCharSprite"
-                            accept="image/*"
-                        />
+                        <label>Pos Y (%)</label>
+                        <input type="number" id="propY" step="0.1" oninput="updateOverlayFromProps()" />
                     </div>
+                    <div class="form-group">
+                        <label>Scale (Factor)</label>
+                        <input type="number" id="propScale" step="0.01" min="0.1" oninput="updateOverlayFromProps()" />
+                    </div>
+                    <hr style="
+                                border: 0;
+                                border-top: 1px solid #eee;
+                                margin: 20px 0;
+                            " />
+                    <p style="
+                                font-size: 11px;
+                                color: #666;
+                                line-height: 1.4;
+                            ">
+                        Use the handles to resize.<br />
+                        Drag to move.<br />
+                        Values are relative to the base image size.
+                    </p>
                 </div>
                 <div class="modal-footer">
-                    <button class="primary-btn" onclick="createNewCharacter()">
-                        Create
+                    <button class="primary-btn" style="width: 100%" onclick="saveOverlayPosition()">
+                        Apply & Save
                     </button>
                 </div>
             </div>
         </div>
+    </div>
 
-        <div id="slideContextMenu" class="context-menu">
-            <button onclick="contextMenuAction('copy')">Copy</button>
-            <button onclick="contextMenuAction('cut')">Cut</button>
-            <button onclick="contextMenuAction('paste')">Paste</button>
-            <button onclick="contextMenuAction('duplicate')">Duplicate</button>
-            <button
-                onclick="contextMenuAction('remove')"
-                style="color: #fa2323"
-            >
-                Remove
-            </button>
+    <div id="addCharModal" class="modal-overlay">
+        <div class="modal-box">
+            <div class="modal-header">
+                <h3>Add New Character</h3>
+                <button onclick="closeModal('addCharModal')">
+                    &times;
+                </button>
+            </div>
+            <div class="modal-body">
+                <div class="form-group">
+                    <label>Name</label>
+                    <input type="text" id="newCharName" placeholder="Character Name" />
+                </div>
+                <div class="form-group">
+                    <label>Main Sprite (Optional)</label>
+                    <input type="file" id="newCharSprite" accept="image/*" />
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="primary-btn" onclick="createNewCharacter()">
+                    Create
+                </button>
+            </div>
         </div>
+    </div>
 
-        <script src="settings.js"></script>
-        <script src="pinch-zoom.override.js"></script>
-        <script src="ui-overrides.js"></script>
-        <script src="main.js"></script>
-        <script src="preview.js"></script>
-    </body>
+    <div id="slideContextMenu" class="context-menu">
+        <button onclick="contextMenuAction('copy')">Copy</button>
+        <button onclick="contextMenuAction('cut')">Cut</button>
+        <button onclick="contextMenuAction('paste')">Paste</button>
+        <button onclick="contextMenuAction('duplicate')">Duplicate</button>
+        <button onclick="contextMenuAction('remove')" style="color: #fa2323">
+            Remove
+        </button>
+    </div>
+
+    <script src="settings.js"></script>
+    <script src="pinch-zoom.override.js"></script>
+    <script src="ui-overrides.js"></script>
+    <script src="ui-inspector-resize.js"></script>
+    <script src="main.js"></script>
+    <script src="preview.js"></script>
+</body>
+
 </html>
