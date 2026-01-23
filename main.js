@@ -1,4 +1,3 @@
-
 let project = {
   assets: {
     backgrounds: [],
@@ -35,7 +34,10 @@ let project = {
       frames: [
         {
           id: 100,
-          text: { "EN": "Welcome! Drag characters to the slots.", "TH": "ยินดีต้อนรับ! ลากตัวละครไปยังช่องว่าง" },
+          text: {
+            EN: "Welcome! Drag characters to the slots.",
+            TH: "ยินดีต้อนรับ! ลากตัวละครไปยังช่องว่าง",
+          },
           speakerId: "",
           background: "none",
           slots: [null, null, null, null],
@@ -69,7 +71,7 @@ function scheduleAutoSave(reason = "") {
             activeFilmstripTab,
             stageView,
             editorState,
-            editorLanguage
+            editorLanguage,
           },
         },
       };
@@ -199,10 +201,10 @@ function createFrameFromTemplate(templateFrame) {
     clone.returnToFrame = "end";
   }
 
-  if (typeof clone.text === 'string') {
-    clone.text = { "EN": clone.text };
+  if (typeof clone.text === "string") {
+    clone.text = { EN: clone.text };
   } else if (!clone.text) {
-    clone.text = { "EN": "" };
+    clone.text = { EN: "" };
   }
 
   return clone;
@@ -265,7 +267,7 @@ function addChapter() {
   project.chapters.push(newChapter);
   newChapter.frames.push({
     id: Date.now(),
-    text: { "EN": "Chapter Start" },
+    text: { EN: "Chapter Start" },
     speakerId: "",
     background: "none",
     slots: [null, null, null, null, null],
@@ -292,7 +294,7 @@ function newProject() {
         frames: [
           {
             id: Date.now() + 1,
-            text: { "EN": "Start" },
+            text: { EN: "Start" },
             speakerId: "",
             background: "none",
             slots: [null, null, null, null, null],
@@ -326,7 +328,7 @@ function addFrame() {
   const template = chapter.frames.length
     ? chapter.frames[chapter.frames.length - 1]
     : {
-      text: { "EN": "" },
+      text: { EN: "" },
       speakerId: "",
       background: "none",
       slots: [null, null, null, null, null],
@@ -360,8 +362,8 @@ function updateSlotProp(key, val) {
 
 function updateText(val) {
   const frame = getFrame();
-  if (typeof frame.text !== 'object' || frame.text === null) {
-    frame.text = { "EN": frame.text || "" };
+  if (typeof frame.text !== "object" || frame.text === null) {
+    frame.text = { EN: frame.text || "" };
   }
   frame.text[editorLanguage] = val;
 
@@ -392,25 +394,32 @@ function handleLanguageSelect(selectEl) {
 function addNewLanguage() {
   // ใช้ showPrompt ซึ่งเป็น Modal ของระบบ (จาก ui-overrides.js)
   if (typeof showPrompt === "function") {
-    showPrompt("Add New Language", "Enter language code (e.g. FR, DE, VI):", (val) => {
-      const code = val ? val.toUpperCase().trim() : "";
+    showPrompt(
+      "Add New Language",
+      "Enter language code (e.g. FR, DE, VI):",
+      (val) => {
+        const code = val ? val.toUpperCase().trim() : "";
 
-      if (!code) return;
+        if (!code) return;
 
-      if (supportedLanguages.includes(code)) {
-        if (typeof showToast === "function") showToast("Language already exists!", "error");
-        return;
-      }
+        if (supportedLanguages.includes(code)) {
+          if (typeof showToast === "function")
+            showToast("Language already exists!", "error");
+          return;
+        }
 
-      supportedLanguages.push(code);
+        supportedLanguages.push(code);
 
-      if (!project.languages) project.languages = [...supportedLanguages];
-      else if (!project.languages.includes(code)) project.languages.push(code);
+        if (!project.languages) project.languages = [...supportedLanguages];
+        else if (!project.languages.includes(code))
+          project.languages.push(code);
 
-      changeEditorLanguage(code);
+        changeEditorLanguage(code);
 
-      if (typeof showToast === "function") showToast(`Language ${code} added`, "success");
-    });
+        if (typeof showToast === "function")
+          showToast(`Language ${code} added`, "success");
+      },
+    );
   } else {
     // Fallback กรณีไม่มี ui-overrides
     const lang = prompt("Enter new language code:");
@@ -434,7 +443,7 @@ function updateFrameChoice(index, key, val) {
       const c = frame.choices[index];
       if (typeof c.text !== "object" || c.text === null) {
         c.text = {
-          "EN": c.text || ""
+          EN: c.text || "",
         };
       }
       c.text[editorLanguage] = val;
@@ -694,7 +703,8 @@ function renderStage() {
     : "#666";
 
   let text = getLocalizedFrameText(frame) || "";
-  document.getElementById("overlayText").innerHTML = unityToHtml(text) || "Click here to edit text...";
+  document.getElementById("overlayText").innerHTML =
+    unityToHtml(text) || "Click here to edit text...";
 
   for (let i = 0; i < 5; i++) {
     const zone = document.querySelector(`.slot-zone[data-slot="${i}"]`);
@@ -833,6 +843,21 @@ function renderFilmstrip() {
   reel.innerHTML = html;
 }
 
+
+function toggleSyntax(el) {
+  const currentText = el.innerText;
+  const val = el.dataset.val;
+  const display = el.dataset.display;
+
+  if (el.classList.contains("expanded")) {
+    el.innerText = display;
+    el.classList.remove("expanded");
+  } else {
+    el.innerText = val;
+    el.classList.add("expanded");
+  }
+}
+
 function unityToHtml(text) {
   if (!text) return "";
   let html = text.replace(/</g, "&lt;").replace(/>/g, "&gt;");
@@ -840,12 +865,29 @@ function unityToHtml(text) {
   html = html.replace(/&lt;i&gt;(.*?)&lt;\/i&gt;/gi, "<i>$1</i>");
   html = html.replace(/&lt;u&gt;(.*?)&lt;\/u&gt;/gi, "<u>$1</u>");
   html = html.replace(/&lt;s&gt;(.*?)&lt;\/s&gt;/gi, "<s>$1</s>");
-  html = html.replace(/&lt;color=(.*?)&gt;(.*?)&lt;\/color&gt;/gi, "<span style='color:$1'>$2</span>");
-  html = html.replace(/&lt;size=(.*?)&gt;(.*?)&lt;\/size&gt;/gi, "<span style='font-size:1.2em'>$2</span>");
-  html = html.replace(/\{([^}]+)\}/g, '<span style="color:#3b82f6;font-weight:bold;">[$1]</span>');
+
+  // Syntax Tag Support
+  html = html.replace(
+    /&lt;syntax val=&quot;(.*?)&quot;&gt;(.*?)&lt;\/syntax&gt;/gi,
+    "<span class='interactive-syntax' onclick='toggleSyntax(this)' data-val='$1' data-display='$2'>$2</span>"
+  );
+
+  html = html.replace(
+    /&lt;color=(.*?)&gt;(.*?)&lt;\/color&gt;/gi,
+    "<span style='color:$1'>$2</span>",
+  );
+  html = html.replace(
+    /&lt;size=(.*?)&gt;(.*?)&lt;\/size&gt;/gi,
+    "<span style='font-size:1.2em'>$2</span>",
+  );
+  html = html.replace(
+    /\{([^}]+)\}/g,
+    '<span style="color:#3b82f6;font-weight:bold;">[$1]</span>',
+  );
   html = html.replace(/\n/g, "<br>");
   return html;
 }
+
 
 // ฟังก์ชันแทรก Tag ลงใน Textarea ณ ตำแหน่ง Cursor
 function insertTextTag(tagType) {
@@ -861,13 +903,39 @@ function insertTextTag(tagType) {
   let close = "";
 
   switch (tagType) {
-    case "b": open = "<b>"; close = "</b>"; break;
-    case "i": open = "<i>"; close = "</i>"; break;
-    case "u": open = "<u>"; close = "</u>"; break;
-    case "s": open = "<s>"; close = "</s>"; break;
-    case "color": open = "<color=#FF0000>"; close = "</color>"; break;
-    case "size": open = "<size=120%>"; close = "</size>"; break;
-    case "br": open = "\n"; close = ""; break;
+    case "b":
+      open = "<b>";
+      close = "</b>";
+      break;
+    case "i":
+      open = "<i>";
+      close = "</i>";
+      break;
+    case "u":
+      open = "<u>";
+      close = "</u>";
+      break;
+    case "s":
+      open = "<s>";
+      close = "</s>";
+      break;
+    case "syntax":
+      open = '<syntax val="HIDDEN">';
+      close = "</syntax>";
+      break;
+
+    case "color":
+      open = "<color=#FF0000>";
+      close = "</color>";
+      break;
+    case "size":
+      open = "<size=120%>";
+      close = "</size>";
+      break;
+    case "br":
+      open = "\n";
+      close = "";
+      break;
   }
 
   // ถ้าไม่มีการเลือกข้อความ ให้แทรก Tag คร่อมตรงกลางว่างๆ หรือแทรก Tag เปิดปิด
@@ -879,211 +947,151 @@ function insertTextTag(tagType) {
   updateText(textarea.value);
 
   // ย้าย Cursor ไปข้างใน Tag (กรณีไม่ได้เลือก Text) หรือหลัง Tag (กรณีเลือก Text)
-  const newCursorPos = selectedText.length > 0 ? start + replacement.length : start + open.length;
+  const newCursorPos =
+    selectedText.length > 0 ? start + replacement.length : start + open.length;
   textarea.focus();
   textarea.setSelectionRange(newCursorPos, newCursorPos);
 }
 
-// ฟังก์ชันอัปเดต Preview เมื่อพิมพ์
-function onTmInput(val) {
-  updateText(val); // ฟังก์ชันเดิมของระบบที่บันทึกข้อมูล
-  const previewEl = document.getElementById("tmPreview");
-  if (previewEl) previewEl.innerHTML = unityToHtml(val);
-}
-
 // --- Text Editor Logic ---
-let tempEditorText = ""; // เก็บค่าชั่วคราวก่อนกด Save
-
-// ฟังก์ชันเปิด Editor
-function openTextEditor() {
-  const frame = getFrame();
-  if (!frame) return;
-
-  const currentText = getLocalizedFrameText(frame);
-  tempEditorText = currentText;
-
-  // Setup Input
-  const input = document.getElementById("modalTextInput");
-  input.value = currentText;
-
-  // Trigger ให้แสดงผลที่หน้าจอ Stage ทันทีตอนเปิด
-  onModalTextChange(currentText);
-
-  openModal("textEditorModal");
-
-  // Auto focus at end of text
-  setTimeout(() => {
-    input.focus();
-    input.setSelectionRange(input.value.length, input.value.length);
-  }, 100);
-}
-
-// ฟังก์ชันทำงานเมื่อพิมพ์ข้อความ (Realtime Update)
-function onModalTextChange(val) {
-  tempEditorText = val;
-  const html = unityToHtml(val);
-
-  // 1. อัปเดตที่ Dialogue Box บน Workspace (ID: overlayText)
-  const workspaceText = document.getElementById("overlayText");
-  if (workspaceText) {
-    workspaceText.innerHTML = html || "<span style='opacity:0.5'>...</span>";
-  }
-
-  // 2. อัปเดตที่ Preview Player (ID: pText) ถ้าเปิดอยู่
-  const previewText = document.getElementById("pText");
-  if (previewText) {
-    previewText.innerHTML = html;
-  }
-}
-
-function saveTextEditor() {
-  // บันทึกค่าลงใน Frame จริงๆ
-  updateText(tempEditorText);
-  closeModal("textEditorModal");
-  renderInspector(); // Refresh Inspector
-}
-
-function showColorPicker(onSelect) {
-  const uiModal = document.getElementById("uiGenericModal");
-  const uiTitle = document.getElementById("uiModalTitle");
-  const uiMessage = document.getElementById("uiModalMessage");
-  const uiContent = document.getElementById("uiModalContent");
-  const btnConfirm = document.getElementById("uiModalConfirm");
-  const btnCancel = document.getElementById("uiModalCancel");
-
-  if (!uiModal) return;
-
-  uiTitle.textContent = "Select Color";
-  uiMessage.textContent = "Choose a color or enter hex code:";
-  uiContent.innerHTML = "";
-
-  btnConfirm.style.display = "none";
-
-  const grid = document.createElement("div");
-  grid.style.display = "grid";
-  grid.style.gridTemplateColumns = "repeat(5, 1fr)";
-  grid.style.gap = "8px";
-  grid.style.marginBottom = "15px";
-
-  const colors = [
-    "#ffffff", "#000000", "#ef4444", "#f97316", "#f59e0b",
-    "#10b981", "#3b82f6", "#6366f1", "#8b5cf6", "#ec4899",
-    "#64748b", "#a1a1aa", "#fee2e2", "#dbeafe", "#d1fae5"
-  ];
-
-  colors.forEach(c => {
-    const btn = document.createElement("div");
-    btn.style.backgroundColor = c;
-    btn.style.height = "32px";
-    btn.style.borderRadius = "4px";
-    btn.style.cursor = "pointer";
-    btn.style.border = "1px solid #ddd";
-    btn.title = c;
-
-    btn.onclick = () => {
-      onSelect(c);
-      uiModal.style.display = "none";
-      btnConfirm.style.display = "inline-block";
-    };
-    grid.appendChild(btn);
-  });
-
-  uiContent.appendChild(grid);
-
-  const wrapper = document.createElement("div");
-  wrapper.style.display = "flex";
-  wrapper.style.gap = "8px";
-  wrapper.style.alignItems = "center";
-
-  const input = document.createElement("input");
-  input.type = "text";
-  input.className = "ui-modal-input";
-  input.style.margin = "0";
-  input.style.flex = "1";
-  input.placeholder = "Hex (#RRGGBB)";
-
-  const okBtn = document.createElement("button");
-  okBtn.className = "primary-btn";
-  okBtn.textContent = "Use Hex";
-  okBtn.onclick = () => {
-    if (input.value) {
-      onSelect(input.value);
-      uiModal.style.display = "none";
-      btnConfirm.style.display = "inline-block";
-    }
-  };
-
-  wrapper.appendChild(input);
-  wrapper.appendChild(okBtn);
-  uiContent.appendChild(wrapper);
-
-  uiModal.style.display = "flex";
-  input.focus();
-
-  btnCancel.onclick = () => {
-    uiModal.style.display = "none";
-    btnConfirm.style.display = "inline-block";
-  };
-}
-
-function editorInsertTag(tagType) {
-  const textarea = document.getElementById("modalTextInput");
-  if (!textarea) return;
-
-  const start = textarea.selectionStart;
-  const end = textarea.selectionEnd;
-  const text = textarea.value;
-  const selectedText = text.substring(start, end);
-
-  if (tagType === "color") {
-    showColorPicker((color) => {
-      const open = `<color=${color}>`;
-      const close = `</color>`;
-      const replacement = open + selectedText + close;
-      textarea.value = text.substring(0, start) + replacement + text.substring(end);
-      onModalTextChange(textarea.value);
-      textarea.focus();
-      const newCursor = selectedText.length > 0 ? start + replacement.length : start + open.length;
-      textarea.setSelectionRange(newCursor, newCursor);
-    });
-    return;
-  }
-
-  let open = "", close = "";
-
-  switch (tagType) {
-    case "b": open = "<b>"; close = "</b>"; break;
-    case "i": open = "<i>"; close = "</i>"; break;
-    case "u": open = "<u>"; close = "</u>"; break;
-    case "s": open = "<s>"; close = "</s>"; break;
-    case "size": open = "<size=120%>"; close = "</size>"; break;
-    case "br": open = "\n"; close = ""; break;
-  }
-
-  const replacement = open + selectedText + close;
-  textarea.value = text.substring(0, start) + replacement + text.substring(end);
-
-  onModalTextChange(textarea.value);
-
-  textarea.focus();
-  const newCursor = selectedText.length > 0 ? start + replacement.length : start + open.length;
-  textarea.setSelectionRange(newCursor, newCursor);
-}
+// Logic moved to dialogue-editor.js
 
 function unityToHtml(text) {
   if (!text) return "";
   let html = text.replace(/</g, "&lt;").replace(/>/g, "&gt;");
+
+  // 1. Basic Formatting
   html = html.replace(/&lt;b&gt;(.*?)&lt;\/b&gt;/gi, "<b>$1</b>");
   html = html.replace(/&lt;i&gt;(.*?)&lt;\/i&gt;/gi, "<i>$1</i>");
   html = html.replace(/&lt;u&gt;(.*?)&lt;\/u&gt;/gi, "<u>$1</u>");
   html = html.replace(/&lt;s&gt;(.*?)&lt;\/s&gt;/gi, "<s>$1</s>");
-  html = html.replace(/&lt;color=(.*?)&gt;(.*?)&lt;\/color&gt;/gi, "<span style='color:$1'>$2</span>");
-  html = html.replace(/&lt;size=(.*?)&gt;(.*?)&lt;\/size&gt;/gi, "<span style='font-size:1.2em'>$2</span>");
-  html = html.replace(/\{([^}]+)\}/g, '<span style="color:#3b82f6;font-weight:bold;">[$1]</span>');
+
+  // 2. Syntax Tag Support <syntax val="...">...</syntax>
+  html = html.replace(
+    /&lt;syntax val=&quot;(.*?)&quot;&gt;(.*?)&lt;\/syntax&gt;/gi,
+    "<span class='interactive-syntax' onclick='toggleSyntax(this)' data-val='$1' data-display='$2'>$2</span>"
+  );
+
+  // 3. Unity Rich Text <color=...>...</color>
+  html = html.replace(
+    /&lt;color=(.*?)&gt;(.*?)&lt;\/color&gt;/gi,
+    "<span style='color:$1'>$2</span>",
+  );
+  html = html.replace(
+    /&lt;size=(.*?)&gt;(.*?)&lt;\/size&gt;/gi,
+    "<span style='font-size:1.2em'>$2</span>",
+  );
+
+  // 4. KV Tag Support {key:value} -> <span class="kv-tag">value</span>
+  // This regex looks for {key:value} pattern
+  html = html.replace(
+    /\{([^:]+):([^}]+)\}/g,
+    "<span class='kv-tag' data-full='{$1:$2}'>$2</span>"
+  );
+
+  // 5. Old variable support {var} (fallback if not matching key:value)
+  html = html.replace(
+    /\{([^}:]+)\}/g,
+    '<span style="color:#3b82f6;font-weight:bold;">[$1]</span>',
+  );
+
   html = html.replace(/\n/g, "<br>");
   return html;
 }
 
+function htmlToUnity(html) {
+  let temp = document.createElement("div");
+  temp.innerHTML = html;
+
+  // Pre-process special spans back to raw text before traversal
+  const syntaxSpans = temp.querySelectorAll(".interactive-syntax");
+  syntaxSpans.forEach(span => {
+    const val = span.getAttribute("data-val");
+    const display = span.innerText; // Current visible text might be val or display
+    // Ideally we reconstruct the original tag. 
+    // Note: The user might have clicked it, so innerText could be 'val'.
+    // But the original tag structure is <syntax val="VAL">DISPLAY</syntax>.
+    // We rely on data-display if available, otherwise innerText.
+    const originalDisplay = span.getAttribute("data-display") || display;
+    const originalVal = val || "";
+    const replacement = document.createTextNode(`<syntax val="${originalVal}">${originalDisplay}</syntax>`);
+    span.parentNode.replaceChild(replacement, span);
+  });
+
+  const kvSpans = temp.querySelectorAll(".kv-tag");
+  kvSpans.forEach(span => {
+    const full = span.getAttribute("data-full");
+    if (full) {
+      const replacement = document.createTextNode(full);
+      span.parentNode.replaceChild(replacement, span);
+    }
+  });
+
+  function traverse(node) {
+    let out = "";
+    for (let child of node.childNodes) {
+      if (child.nodeType === 3) {
+        out += child.textContent;
+      } else if (child.nodeType === 1) {
+        // If it's a BR tag, handle strictly
+        if (child.tagName.toLowerCase() === "br") {
+          out += "\n";
+          continue;
+        }
+
+        let content = traverse(child);
+        let style = window.getComputedStyle(child);
+        let tagName = child.tagName.toLowerCase();
+
+        // Reconstruct basic tags
+        if (tagName === "b" || tagName === "strong" || style.fontWeight === "bold" || parseInt(style.fontWeight) >= 700) {
+          content = `<b>${content}</b>`;
+        }
+        if (tagName === "i" || tagName === "em" || style.fontStyle === "italic") {
+          content = `<i>${content}</i>`;
+        }
+        if (tagName === "u" || style.textDecorationLine.includes("underline")) {
+          content = `<u>${content}</u>`;
+        }
+        if (tagName === "s" || tagName === "strike" || style.textDecorationLine.includes("line-through")) {
+          content = `<s>${content}</s>`;
+        }
+
+        if (child.style.color || child.color) {
+          let c = child.style.color || child.color;
+          if (c.startsWith("rgb")) c = rgbToHex(c);
+          content = `<color=${c}>${content}</color>`;
+        }
+
+        // Block elements handling
+        if (tagName === "div" || tagName === "p") {
+          // check if not empty or has br
+          if (out.length > 0) content = "\n" + content;
+        }
+
+        out += content;
+      }
+    }
+    return out;
+  }
+
+  let raw = traverse(temp);
+  // Clean up extra newlines logic if needed, but simple traversal usually creates 
+  // accurate structure if <br> -> \n mapping is 1:1.
+  return raw;
+}
+
+function rgbToHex(rgb) {
+  let sep = rgb.indexOf(",") > -1 ? "," : " ";
+  rgb = rgb.substr(4).split(")")[0].split(sep);
+  let r = (+rgb[0]).toString(16),
+    g = (+rgb[1]).toString(16),
+    b = (+rgb[2]).toString(16);
+  if (r.length == 1) r = "0" + r;
+  if (g.length == 1) g = "0" + g;
+  if (b.length == 1) b = "0" + b;
+  return "#" + r + g + b;
+}
 
 function renderInspector() {
   const container = document.getElementById("inspectorContent");
@@ -1102,13 +1110,31 @@ function renderInspector() {
 
   if (selectedSlotIndex === -1) {
     // --- Frame Inspector ---
-    const speakerOpts = project.characters.map(c => `<option value="${c.id}" ${frame.speakerId === c.id ? "selected" : ""}>${c.name}</option>`).join("");
-    const bgOpts = ["none", ...project.assets.backgrounds.map(b => b.name)].map(n => `<option value="${n}" ${frame.background === n ? "selected" : ""}>${n}</option>`).join("");
-    const langOpts = supportedLanguages.map(l => `<option value="${l}" ${editorLanguage === l ? "selected" : ""}>${l}</option>`).join("");
+    const speakerOpts = project.characters
+      .map(
+        (c) =>
+          `<option value="${c.id}" ${frame.speakerId === c.id ? "selected" : ""}>${c.name}</option>`,
+      )
+      .join("");
+    const bgOpts = ["none", ...project.assets.backgrounds.map((b) => b.name)]
+      .map(
+        (n) =>
+          `<option value="${n}" ${frame.background === n ? "selected" : ""}>${n}</option>`,
+      )
+      .join("");
+    const langOpts = supportedLanguages
+      .map(
+        (l) =>
+          `<option value="${l}" ${editorLanguage === l ? "selected" : ""}>${l}</option>`,
+      )
+      .join("");
 
     // ดึง Text ปัจจุบันมาแสดงผลย่อๆ
     const currentText = getLocalizedFrameText(frame);
-    const textPreview = currentText.length > 50 ? currentText.substring(0, 50) + "..." : (currentText || "(No text)");
+    const textPreview =
+      currentText.length > 50
+        ? currentText.substring(0, 50) + "..."
+        : currentText || "(No text)";
 
     // จัดการ State ของ Details
     const choicesEl = container.querySelector("#details-choices");
@@ -1116,7 +1142,11 @@ function renderInspector() {
     const execEl = container.querySelector("#details-exec");
     const execOpen = execEl ? execEl.hasAttribute("open") : true;
     const choiceOpenMap = {};
-    container.querySelectorAll("[data-choice-open]").forEach((el) => (choiceOpenMap[el.getAttribute("data-choice-open")] = true));
+    container
+      .querySelectorAll("[data-choice-open]")
+      .forEach(
+        (el) => (choiceOpenMap[el.getAttribute("data-choice-open")] = true),
+      );
 
     container.innerHTML = `
       ${styles}
@@ -1138,8 +1168,8 @@ function renderInspector() {
                 </select>
             </div>
         </div>
-        
-        <div style="border: 1px solid var(--border); border-radius: 6px; padding: 10px; background: var(--bg-secondary); cursor: pointer; transition: all 0.2s;" 
+
+        <div style="border: 1px solid var(--border); border-radius: 6px; padding: 10px; background: var(--bg-secondary); cursor: pointer; transition: all 0.2s;"
              onclick="openTextEditor()"
              title="Click to edit dialogue">
             <div style="font-size: 11px; color: var(--text-muted); margin-bottom: 4px; display:flex; justify-content:space-between;">
@@ -1154,11 +1184,15 @@ function renderInspector() {
 
       <details id="details-choices" class="form-group" style="border-top:1px solid var(--border); margin-top:10px; padding-top:10px;" ${choicesOpen ? "open" : ""}>
           <summary>${iconExpanded}${iconCollapsed}Choices</summary>
-          ${(frame.choices || []).map((c, i) => {
-      const type = c.type || "jump";
-      const isOpen = !!choiceOpenMap[String(i)];
-      const choiceTextVal = (typeof c.text === 'object' && c.text !== null) ? (c.text[editorLanguage] || "") : (c.text || "");
-      return `<details data-choice-open="${isOpen ? i : ""}" style="background: rgba(0,0,0,0.05); padding: 8px; border-radius: 4px; margin-bottom: 8px; border: 1px solid var(--border);" ${isOpen ? "open" : ""}>
+          ${(frame.choices || [])
+        .map((c, i) => {
+          const type = c.type || "jump";
+          const isOpen = !!choiceOpenMap[String(i)];
+          const choiceTextVal =
+            typeof c.text === "object" && c.text !== null
+              ? c.text[editorLanguage] || ""
+              : c.text || "";
+          return `<details data-choice-open="${isOpen ? i : ""}" style="background: rgba(0,0,0,0.05); padding: 8px; border-radius: 4px; margin-bottom: 8px; border: 1px solid var(--border);" ${isOpen ? "open" : ""}>
                   <summary style="font-size:12px; font-weight:700;">Choice ${i + 1}</summary>
                   <div style="margin-bottom: 4px;">
                       <label style="font-size: 11px;">Type</label>
@@ -1172,23 +1206,28 @@ function renderInspector() {
                       <input class="inspector-input" type="text" value="${choiceTextVal}" oninput="updateFrameChoice(${i}, 'text', this.value)">
                   </div>
                   ${type === "jump"
-          ? `<div style="margin-bottom: 4px;"><label style="font-size: 11px;">Target</label><button class="primary-btn small" onclick="openNodeGraphV2()" style="width:100%">Open Graph</button></div>`
-          : `<div style="margin-bottom: 4px;"><label style="font-size: 11px;">Function</label><input class="inspector-input" type="text" value="${c.target || ""}" onchange="updateFrameChoice(${i}, 'target', this.value)" placeholder="func()"></div>`
-        }
+              ? `<div style="margin-bottom: 4px;"><label style="font-size: 11px;">Target</label><button class="primary-btn small" onclick="openNodeGraphV2()" style="width:100%">Open Graph</button></div>`
+              : `<div style="margin-bottom: 4px;"><label style="font-size: 11px;">Function</label><input class="inspector-input" type="text" value="${c.target || ""}" onchange="updateFrameChoice(${i}, 'target', this.value)" placeholder="func()"></div>`
+            }
                   <button class="danger small" onclick="removeFrameChoice(${i})" style="width: 100%; margin-top: 4px;">Remove</button>
               </details>`;
-    }).join("")}
+        })
+        .join("")}
           <button class="primary-btn small" onclick="addFrameChoice()" style="width: 100%;">+ Add Choice</button>
       </details>
 
       <details id="details-exec" class="form-group" style="border-top:1px solid var(--border); margin-top:10px; padding-top:10px;" ${execOpen ? "open" : ""}>
           <summary>${iconExpanded}${iconCollapsed}Execute Function</summary>
-          ${(frame.executeFunctions || []).map((val, i) => `
+          ${(frame.executeFunctions || [])
+        .map(
+          (val, i) => `
               <div style="margin-bottom: 4px; display:flex; gap:4px;">
                   <input class="inspector-input" type="text" value="${val}" oninput="updateExecuteFunction(${i}, this.value)" placeholder="Func()">
                   <button class="danger small" onclick="deleteExecuteFunction(${i})">X</button>
               </div>
-          `).join("")}
+          `,
+        )
+        .join("")}
           <button class="primary-btn small" onclick="addExecuteFunction()" style="width: 100%;">+ Add Function</button>
       </details>
 
@@ -1204,8 +1243,19 @@ function renderInspector() {
   // --- Character Slot Inspector (คงเดิม) ---
   const slot = frame.slots[selectedSlotIndex];
   const char = project.characters.find((c) => c.id === slot.charId);
-  const bodyOpts = char.bodies.map(b => `<option value="${b.name}" ${slot.body === b.name ? "selected" : ""}>${b.name}</option>`).join("");
-  const faceOpts = ['<option value="none">none</option>', ...char.faces.map(f => `<option value="${f.name}" ${slot.face === f.name ? "selected" : ""}>${f.name}</option>`)].join("");
+  const bodyOpts = char.bodies
+    .map(
+      (b) =>
+        `<option value="${b.name}" ${slot.body === b.name ? "selected" : ""}>${b.name}</option>`,
+    )
+    .join("");
+  const faceOpts = [
+    '<option value="none">none</option>',
+    ...char.faces.map(
+      (f) =>
+        `<option value="${f.name}" ${slot.face === f.name ? "selected" : ""}>${f.name}</option>`,
+    ),
+  ].join("");
 
   container.innerHTML = `
       <div style="margin-bottom:15px;padding-bottom:10px;border-bottom:1px solid var(--border);"><strong>${char.name}</strong> (Slot ${selectedSlotIndex})</div>
@@ -1539,7 +1589,7 @@ function showSlideContextMenu(x, y) {
   const menu = document.getElementById("slideContextMenu");
   menu.style.display = "block";
   menu.style.left = x + 20 + "px";
-  menu.style.top = y - 30 + "px";
+  menu.style.top = y - 150 + "px";
 }
 
 function onFrameContextMenu(e) {
@@ -1617,9 +1667,59 @@ async function saveJSON() {
   if (typeof showLoading === "function") showLoading("Saving project...");
   try {
     await optimizeProjectImages();
-
     const jsonString = JSON.stringify(project);
 
+    // Modern Save As (File System Access API)
+    if (window.showSaveFilePicker) {
+      try {
+        const handle = await window.showSaveFilePicker({
+          suggestedName: "vn-project-save.vns",
+          types: [
+            {
+              description: "Visual NV Save (.vns)",
+              accept: { "application/gzip": [".vns"] },
+            },
+            {
+              description: "JSON Project (.json)",
+              accept: { "application/json": [".json"] },
+            },
+          ],
+        });
+
+        const writable = await handle.createWritable();
+
+        let blobToWrite;
+        // Check file extension to decide on compression
+        if (handle.name.endsWith(".json")) {
+          blobToWrite = new Blob([jsonString], { type: "application/json" });
+        } else {
+          // Default to VNS/GZIP
+          if (window.CompressionStream) {
+            const stream = new Blob([jsonString]).stream();
+            const compressedStream = stream.pipeThrough(new CompressionStream("gzip"));
+            blobToWrite = await new Response(compressedStream).blob();
+          } else {
+            // Fallback if browser supports FS API but not CompressionStream? Unlikely but safe.
+            blobToWrite = new Blob([jsonString], { type: "application/json" });
+          }
+        }
+
+        await writable.write(blobToWrite);
+        await writable.close();
+
+        if (typeof toast === "function") toast("Project saved successfully!");
+        return; // Success
+      } catch (err) {
+        if (err.name === "AbortError") {
+          // User cancelled
+          return;
+        }
+        console.warn("File Picker failed, falling back to download:", err);
+        // Fallthrough to download method
+      }
+    }
+
+    // Fallback Legacy Download
     if (window.CompressionStream) {
       const stream = new Blob([jsonString]).stream();
       const compressedStream = stream.pipeThrough(
@@ -1716,7 +1816,8 @@ async function importJSON(e) {
       loadChapter(activeChapterId);
       renderCastPalette();
       scheduleAutoSave("import_project");
-      if (typeof showToast === "function") showToast("Project loaded", "success");
+      if (typeof showToast === "function")
+        showToast("Project loaded", "success");
     } else alert("Invalid format");
   } catch (err) {
     console.error(err);
@@ -2130,7 +2231,7 @@ function newProject() {
           frames: [
             {
               id: 100,
-              text: { "EN": "Start here..." },
+              text: { EN: "Start here..." },
               speakerId: "",
               background: "none",
               slots: [null, null, null, null],

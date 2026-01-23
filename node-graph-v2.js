@@ -54,7 +54,8 @@
       startFrameId: null,
       endFrameId: null,
 
-      selectedNodeId: null,
+      selectedNodeIds: new Set(), // Multi-select support
+      selectionBox: null, // {x, y, w, h} in screen coords for rendering
       selectingFrom: null,
       hoverPort: null,
       hoverNodeId: null,
@@ -80,6 +81,13 @@
 
     function clamp(n, a, b) {
       return Math.max(a, Math.min(b, n));
+    }
+
+    function intersectRect(r1, r2) {
+      return !(r2.x > r1.x + r1.w ||
+        r2.x + r2.w < r1.x ||
+        r2.y > r1.y + r1.h ||
+        r2.y + r2.h < r1.y);
     }
 
     function snap(n, step) {
@@ -160,7 +168,7 @@
         scheduleAutosave("ensure_choice_ids");
         try {
           applyGraphLinksToFrames();
-        } catch (e) {}
+        } catch (e) { }
       }
     }
 
@@ -269,7 +277,7 @@
         }
         STATE.startFrameId = start != null ? start : STATE.startFrameId;
         STATE.endFrameId = end != null ? end : STATE.endFrameId;
-      } catch (e) {}
+      } catch (e) { }
 
       scheduleAutosave("node_graph_v2:apply_to_frames");
       return { ok: true, reason: "" };
@@ -307,7 +315,7 @@
           if (typeof window.scheduleAutoSave === "function") {
             window.scheduleAutoSave(reason);
           }
-        } catch (e) {}
+        } catch (e) { }
         STATE._autosaveTimer = null;
       }, 200);
     }
@@ -413,7 +421,15 @@
           if (type !== "jump") continue;
 
           const cid = safeId(c.id);
-          const text = String(c.text || "Choice").trim();
+          // resolve localized choice text
+          let rawText = "";
+          if (c.text && typeof c.text === "object") {
+            const lang = window.editorLanguage || "EN";
+            rawText = c.text[lang] || c.text["EN"] || "";
+          } else {
+            rawText = String(c.text || "Choice");
+          }
+          const text = rawText.trim();
           outputs.push({
             id: `choice:${cid}`,
             label: `Choice: ${text || "(empty)"}`,
@@ -566,7 +582,7 @@
 
       try {
         applyGraphLinksToFrames();
-      } catch (e) {}
+      } catch (e) { }
 
       scheduleAutosave("node_graph_v2:" + reason);
     }
@@ -642,7 +658,7 @@
   box-shadow: var(--shadow-lg);
   display: grid;
   grid-template-rows: 52px 1fr;
-  overflow: hidden;
+  overflow: visible;
   color: ${CFG.colors.text};
 }
 
@@ -653,6 +669,7 @@
   padding: 10px 12px;
   background: ${CFG.colors.panel2};
   border-bottom: 1px solid ${CFG.colors.border};
+  border-radius: 15px 15px 0 0;
 }
 
 .ngv2-title {
@@ -699,7 +716,9 @@
     radial-gradient(circle at 1px 1px, rgba(0,0,0,0.06) 1px, transparent 0) 0 0 / ${CFG.grid}px ${CFG.grid}px,
     ${CFG.colors.bg};
   cursor: grab;
+  border-radius: 15px;
 }
+
 
 .ngv2-canvas {
   position: absolute;
@@ -760,7 +779,9 @@
 
 .ngv2-node {
   position: absolute;
+  min-width: ${CFG.node.w}px;
   width: ${CFG.node.w}px;
+  max-width: ${CFG.node.w}px;
   border-radius: var(--radius-xl);
   border: 1px solid ${CFG.colors.border};
   background: ${CFG.colors.panel};
@@ -871,7 +892,7 @@
   background: var(--selected-bg);
 }
 
-.ngv2-portLabel { font-size: 12px; color: ${CFG.colors.text}; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ngv2-portLabel { font-size: 12px; color: ${CFG.colors.text}; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 180px; }
 .ngv2-dot {
   width: 12px;
   height: 12px;
@@ -901,6 +922,43 @@
       STATE._cssInjected = true;
     }
 
+    function switchLanguage(lang) {
+      window.editorLanguage = lang;
+      const label = document.getElementById("ngv2-curr-lang-label");
+      if (label) label.textContent = lang;
+
+      const frames = getFrames();
+      const samples = {
+        EN: "Sample Text",
+        TH: "ข้อความตัวอย่าง",
+        JP: "サンプルテキスト",
+        CN: "示例文本",
+      };
+
+      let modified = false;
+      for (const f of frames) {
+        if (!f) continue;
+        if (!f.text || typeof f.text !== "object") {
+          // Convert string to object if necessary
+          const oldVal =
+            typeof f.text === "string" ? f.text : f.text?.["EN"] || "";
+          f.text = { EN: oldVal };
+        }
+
+        if (!f.text[lang]) {
+          if (samples[lang]) {
+            f.text[lang] = samples[lang];
+          } else {
+            f.text[lang] = "empty..";
+          }
+          modified = true;
+        }
+      }
+
+      if (modified) saveToChapter("lang_switch");
+      render();
+    }
+
     function ensureUI() {
       injectCss();
 
@@ -928,6 +986,23 @@
 
       const actions = document.createElement("div");
       actions.className = "ngv2-actions";
+
+      // Language Dropdown
+      const langWrap = document.createElement("div");
+      langWrap.className = "menu-item";
+      langWrap.style.height = "28px";
+      langWrap.style.marginRight = "10px";
+      langWrap.innerHTML = `
+        <span id="ngv2-curr-lang-label">${window.editorLanguage || "EN"
+        }</span> <span style="font-size:10px; margin-left:4px;">▼</span>
+        <div class="dropdown-content" style="top:100%; right:0; left:auto; width: 140px;">
+             <button onclick="window.NodeGraphV2.switchLanguage('EN')">English (EN)</button>
+             <button onclick="window.NodeGraphV2.switchLanguage('TH')">Thai (TH)</button>
+             <button onclick="window.NodeGraphV2.switchLanguage('JP')">Japanese (JP)</button>
+             <button onclick="window.NodeGraphV2.switchLanguage('CN')">Chinese (CN)</button>
+        </div>
+      `;
+      actions.appendChild(langWrap);
 
       const btnClose = document.createElement("button");
       btnClose.textContent = "×";
@@ -1087,13 +1162,13 @@
         const p1 = p1s
           ? p1s
           : worldToScreen(
-              portWorldPos(
-                fromN,
-                "out",
-                0,
-                Math.max(1, getPortsForNode(fromN).outputs.length),
-              ),
-            );
+            portWorldPos(
+              fromN,
+              "out",
+              0,
+              Math.max(1, getPortsForNode(fromN).outputs.length),
+            ),
+          );
         const p2 = p2s ? p2s : worldToScreen(portWorldPos(toN, "in", 0, 1));
 
         const dx = Math.max(60, Math.abs(p2.x - p1.x) * 0.45);
@@ -1132,13 +1207,13 @@
           const p1 = p1s
             ? p1s
             : worldToScreen(
-                portWorldPos(
-                  fromN,
-                  "out",
-                  0,
-                  Math.max(1, getPortsForNode(fromN).outputs.length),
-                ),
-              );
+              portWorldPos(
+                fromN,
+                "out",
+                0,
+                Math.max(1, getPortsForNode(fromN).outputs.length),
+              ),
+            );
 
           const p2 = worldToScreen(STATE._mouseWorld);
 
@@ -1176,7 +1251,7 @@
       el.style.top = `${p.y}px`;
       el.style.transform = `scale(${sc})`;
 
-      if (safeId(STATE.selectedNodeId) === safeId(node.id))
+      if (STATE.selectedNodeIds.has(safeId(node.id)))
         el.classList.add("selected");
 
       const header = document.createElement("div");
@@ -1192,9 +1267,20 @@
       if (node.type === "start") titleText = "Start";
       else if (node.type === "end") titleText = "End";
       else {
-        const rawText = String(frame?.text || "")
-          .trim()
-          .replace(/\s+/g, " ");
+        let rawText = "";
+        if (typeof window.getLocalizedFrameText === "function") {
+          rawText = window.getLocalizedFrameText(frame);
+        } else {
+          // Fallback manual resolution
+          if (frame?.text && typeof frame.text === "object") {
+            const lang = window.editorLanguage || "EN";
+            rawText = frame.text[lang] || frame.text["EN"] || "";
+          } else {
+            rawText = String(frame?.text || "");
+          }
+        }
+
+        rawText = rawText.trim().replace(/\s+/g, " ");
         const MAX = 25;
         titleText =
           rawText.length > MAX ? rawText.slice(0, MAX) + "..." : rawText;
@@ -1358,6 +1444,16 @@
       }
 
       renderLinks();
+
+      if (STATE.selectionBox) {
+        const div = document.createElement("div");
+        div.className = "ngv2-selection-box";
+        div.style.left = STATE.selectionBox.x + "px";
+        div.style.top = STATE.selectionBox.y + "px";
+        div.style.width = STATE.selectionBox.w + "px";
+        div.style.height = STATE.selectionBox.h + "px";
+        canvas.appendChild(div);
+      }
     }
 
     function ensureStartEndNodes() {
@@ -1557,40 +1653,52 @@
           const node = getNode(nodeId);
           if (!node) return;
 
-          STATE.selectedNodeId = nodeId;
+          // Multi-Select Logic
+          if (e.shiftKey) {
+            // Toggle functionality
+            if (STATE.selectedNodeIds.has(nodeId)) {
+              STATE.selectedNodeIds.delete(nodeId);
+            } else {
+              STATE.selectedNodeIds.add(nodeId);
+            }
+          } else {
+            // If clicking an unselected node without shift, select ONLY this node
+            if (!STATE.selectedNodeIds.has(nodeId)) {
+              STATE.selectedNodeIds.clear();
+              STATE.selectedNodeIds.add(nodeId);
+            }
+            // If clicking an ALREADY selected node, do NOT clear (allows dragging the group)
+          }
+
+          // Capture initial positions of ALL selected nodes for dragging
+          const initialPositions = {};
+          for (const nid of STATE.selectedNodeIds) {
+            const n = getNode(nid);
+            if (n) initialPositions[nid] = { x: n.x, y: n.y };
+          }
+
           STATE.drag = {
-            mode: "node",
-            nodeId,
-            start: { x: world.x, y: world.y },
-            origin: { x: node.x, y: node.y },
+            mode: "multi_node",
+            start: { x: world.x, y: world.y }, // World start
+            initialPositions: initialPositions
           };
           render();
           return;
         }
 
-        STATE.selectedNodeId = null;
-
-        if (STATE.selectingFrom) {
-          const existing = findExistingFromLink(
-            STATE.selectingFrom.nodeId,
-            STATE.selectingFrom.portId,
-          );
-          if (existing) {
-            const removed = deleteLink(existing.id);
-            STATE.selectingFrom = null;
-            if (removed) {
-              saveToChapter("disconnect_outgoing");
-              render();
-              toast("Disconnected.");
-              return;
-            }
-          }
-          STATE.selectingFrom = null;
-          render();
-          toast("Canceled.");
-        } else {
-          render();
+        // Clicked on background
+        // Start Box Selection
+        if (!e.shiftKey) {
+          STATE.selectedNodeIds.clear();
         }
+
+        STATE.drag = {
+          mode: "box_select",
+          start: { x: mouse.x, y: mouse.y }, // Screen co-ords for box drawing
+          origin: { x: mouse.x, y: mouse.y }
+        };
+        // No node selected
+        render();
       });
 
       window.addEventListener("mousemove", (e) => {
@@ -1616,15 +1724,67 @@
           return;
         }
 
-        if (STATE.drag?.mode === "node") {
-          const node = getNode(STATE.drag.nodeId);
-          if (!node) return;
-
+        if (STATE.drag?.mode === "multi_node") {
           const dx = world.x - STATE.drag.start.x;
           const dy = world.y - STATE.drag.start.y;
 
-          node.x = snap(STATE.drag.origin.x + dx, CFG.grid);
-          node.y = snap(STATE.drag.origin.y + dy, CFG.grid);
+          for (const nid of STATE.selectedNodeIds) {
+            const node = getNode(nid);
+            const initPos = STATE.drag.initialPositions[nid];
+            if (node && initPos) {
+              node.x = snap(initPos.x + dx, CFG.grid);
+              node.y = snap(initPos.y + dy, CFG.grid);
+            }
+          }
+          render();
+          return;
+        }
+
+        if (STATE.drag?.mode === "box_select") {
+          const currentX = e.clientX - rect.left;
+          const currentY = e.clientY - rect.top;
+
+          const startX = STATE.drag.start.x;
+          const startY = STATE.drag.start.y;
+
+          const minX = Math.min(startX, currentX);
+          const minY = Math.min(startY, currentY);
+          const w = Math.abs(currentX - startX);
+          const h = Math.abs(currentY - startY);
+
+          STATE.selectionBox = { x: minX, y: minY, w, h };
+
+          // Convert selection box to world coords to check intersection
+          // Note: simple box intersection check
+          const boxWorldMin = screenToWorld({ x: minX, y: minY });
+          const boxWorldMax = screenToWorld({ x: minX + w, y: minY + h });
+
+          // Normalize world rect (handle scale flipping if negative? screenToWorld handles basic scaling)
+          const selRect = {
+            x: boxWorldMin.x,
+            y: boxWorldMin.y,
+            w: boxWorldMax.x - boxWorldMin.x,
+            h: boxWorldMax.y - boxWorldMin.y
+          };
+
+          // Select nodes
+          if (!e.shiftKey) STATE.selectedNodeIds.clear();
+
+          for (const node of STATE.nodes) {
+            // Approximate node rect (w=300, h= ~100? use CFG.node.w)
+            // For better accuracy, we could store node sizes. 
+            // Using hardcoded approximation based on CFG
+            const nodeRect = {
+              x: node.x,
+              y: node.y,
+              w: CFG.node.w,
+              h: 120 // Approximation or check nodeScreenRect logic
+            };
+
+            if (intersectRect(selRect, nodeRect)) {
+              STATE.selectedNodeIds.add(safeId(node.id));
+            }
+          }
 
           render();
           return;
@@ -1676,8 +1836,17 @@
         if (STATE.drag) {
           const mode = STATE.drag.mode;
           STATE.drag = null;
+          STATE.selectionBox = null; // Clear selection box
           wrap.style.cursor = "grab";
-          saveToChapter(mode === "node" ? "move_node" : "pan");
+
+          if (mode === "multi_node") {
+            saveToChapter("move_nodes");
+          } else if (mode === "pan") {
+            saveToChapter("pan");
+          } else if (mode === "box_select") {
+            // Selection only, no save needed
+          }
+
           render();
         }
       });
@@ -1695,14 +1864,14 @@
         }
 
         if (e.key === "Delete" || e.key === "Backspace") {
-          if (!STATE.selectedNodeId) return;
+          if (STATE.selectedNodeIds.size === 0) return;
 
-          const nodeId = STATE.selectedNodeId;
+          const idsToCheck = new Set(STATE.selectedNodeIds); // Copy
 
           const changed = removeLinksWhere(
             (l) =>
-              safeId(l?.from?.nodeId) === safeId(nodeId) ||
-              safeId(l?.to?.nodeId) === safeId(nodeId),
+              idsToCheck.has(safeId(l?.from?.nodeId)) ||
+              idsToCheck.has(safeId(l?.to?.nodeId))
           );
           if (changed) {
             saveToChapter("delete_links_for_node");
@@ -1768,6 +1937,7 @@
       open,
       close,
       isOpen,
+      switchLanguage,
       _state: STATE,
     };
   })();

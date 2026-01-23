@@ -31,7 +31,7 @@
 - To optimize images for production, run the `optimizeProjectImages()` logic (implemented in `main.js`) - it performs client-side compression on embedded images.
 
 **Displaying / Previewing Results**:
-- The preview player is implemented in `preview.js`. It reads the active chapter frames and renders characters into four slots (`pSlot0`..`pSlot3`).
+- The preview player is implemented in `preview.js`. It reads the active chapter frames and renders characters into five slots (`pSlot0`..`pSlot4`).
 - The preview supports text typing effect (`typeWriter`) and choices. Use `openPreview()` to launch the preview modal and `nextPreview()` to advance.
 - For embedding exported JSON into other sites/apps, parse the JSON and replicate the preview rendering pipeline: background image, frame slots with `x/y/scale/mirror`, and dialog text.
 
@@ -88,7 +88,7 @@
 - ใช้ข้อมูล `graphV2` ภายใน chapter เพื่อคืนสถานะลิงก์ของ storyline
 
 **การแสดงผล / ดูตัวอย่าง**:
-- ตัวเล่นตัวอย่างทำใน `preview.js` - อ่านเฟรมใน chapter ปัจจุบัน และแสดงตัวละครในสี่ช่อง (`pSlot0`..`pSlot3`)
+- ตัวเล่นตัวอย่างทำใน `preview.js` - อ่านเฟรมใน chapter ปัจจุบัน และแสดงตัวละครในห้าช่อง (`pSlot0`..`pSlot4`)
 - รองรับ effect การพิมพ์ (`typeWriter`) และปุ่มตัวเลือก
 
 **การพัฒนาเพิ่มเติม**:

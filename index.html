@@ -317,10 +317,14 @@
                 </button>
             </div>
             <div class="preview-viewport" id="pViewport" style="position: relative; aspect-ratio: 16/9">
-                <div style="position: absolute; top: 15px; left: 15px; z-index: 300;">
+                <div style="
+                            position: absolute;
+                            top: 15px;
+                            left: 15px;
+                            z-index: 300;
+                        ">
                     <select id="previewLangSelect" class="preview-lang-select" onclick="event.stopPropagation()"
-                        onmousedown="event.stopPropagation()">
-                    </select>
+                        onmousedown="event.stopPropagation()"></select>
                 </div>
                 <div class="nav-zone-right" onclick="
                             if (
@@ -475,37 +479,76 @@
     </div>
 
     <div id="textEditorModal" class="modal-overlay">
-        <div class="modal-box" style="width: 600px; max-width: 90vw; height: 500px;">
+        <div class="modal-box" style="width: 700px; max-width: 95vw; height: 550px; max-height: 90vh">
             <div class="modal-header">
                 <h3>Dialogue Editor</h3>
-                <button onclick="closeModal('textEditorModal')">&times;</button>
+                <div style="flex:1"></div>
+                <!-- Toggle Mode Switch -->
+                <div style="display:flex; align-items:center; gap:8px; margin-right:20px; user-select:none;">
+                    <label class="switch">
+                        <input type="checkbox" id="editorModeToggle" onclick="toggleEditorMode(this.checked)" checked>
+                        <span class="slider"></span>
+                    </label>
+                    <span style="font-size:12px; font-weight:600; color:var(--text-muted)">Preview Mode</span>
+                </div>
+                <button onclick="closeModal('textEditorModal')">
+                    &times;
+                </button>
             </div>
 
-            <div class="modal-body"
-                style="padding: 0; display: flex; flex-direction: column; height: 300px; overflow: hidden;">
+            <div class="modal-body" style="
+                        padding: 0;
+                        display: flex;
+                        flex-direction: column;
+                        flex: 1;
+                        overflow: hidden;
+                    ">
                 <div class="rte-toolbar-horizontal">
-                    <button class="rte-btn" onclick="editorInsertTag('b')" title="Bold"><b>B</b></button>
-                    <button class="rte-btn" onclick="editorInsertTag('i')" title="Italic"><i>I</i></button>
-                    <button class="rte-btn" onclick="editorInsertTag('u')" title="Underline"><u>U</u></button>
-                    <button class="rte-btn" onclick="editorInsertTag('s')" title="Strikethrough"><s>S</s></button>
+                    <button class="rte-btn" onclick="editorInsertTag('b')" title="Bold (Ctrl+B)">
+                        <b>B</b>
+                    </button>
+                    <button class="rte-btn" onclick="editorInsertTag('i')" title="Italic (Ctrl+I)">
+                        <i>I</i>
+                    </button>
+                    <button class="rte-btn" onclick="editorInsertTag('u')" title="Underline (Ctrl+U)">
+                        <u>U</u>
+                    </button>
+                    <button class="rte-btn" onclick="editorInsertTag('s')" title="Strikethrough">
+                        <s>S</s>
+                    </button>
                     <div class="rte-sep"></div>
-                    <button class="rte-btn" onclick="editorInsertTag('color')" title="Color"><span
-                            style="color:#3b82f6; font-weight:bold;">A</span></button>
-                    <button class="rte-btn" onclick="editorInsertTag('size')" title="Size"><span
-                            style="font-size:10px">T</span><span style="font-size:14px">T</span></button>
+                    <button class="rte-btn" onclick="editorInsertTag('color')" title="Text Color">
+                        <span style="color: #3b82f6; font-weight: bold">Color</span>
+                    </button>
+
+                    <button class="rte-btn" onclick="editorInsertTag('size')" title="Font Size">
+                        <span style="font-size: 16px; font-weight: bold">A</span>
+                    </button>
                     <div class="rte-sep"></div>
-                    <button class="rte-btn" onclick="editorInsertTag('br')" title="Line Break">↵</button>
+                    <button class="rte-btn" onclick="editorInsertTag('syntax')" title="Syntax (Hidden Text)">
+                        <span style="font-weight: bold; color: #f97316;">Syn</span>
+                    </button>
+                    <div class="rte-sep"></div>
+                    <button class="rte-btn" onclick="editorInsertTag('removeFormat')" title="Clear Formatting">
+                        <span style="font-weight: bold">✕</span>
+                    </button>
+
                 </div>
 
-                <textarea id="modalTextInput" class="modal-text-input" style="flex: 1; height: auto; resize: none;"
-                    placeholder="Type dialogue text here..." oninput="onModalTextChange(this.value)"></textarea>
-
+                <div id="modalTextInput" class="modal-text-input" contenteditable="true"
+                    placeholder="Type dialogue text here..." oninput="onModalTextChange()"></div>
             </div>
 
             <div class="modal-footer">
-                <button class="danger" onclick="closeModal('textEditorModal')"
-                    style="margin-right: auto;">Cancel</button>
-                <button class="primary-btn" onclick="saveTextEditor()">Save & Close</button>
+                <button class="danger" onclick="closeModal('textEditorModal')" style="margin-right: auto">
+                    Cancel
+                </button>
+                <button class="primary-btn" onclick="saveTextEditor()">
+                    Save &amp; Close
+                </button>
+            </div>
+            <div style="padding: 0 20px 10px 20px; text-align: right; font-size: 11px; color: var(--text-muted);">
+                <span id="charCounter">0/300</span>
             </div>
         </div>
     </div>
@@ -520,11 +563,11 @@
         </button>
     </div>
 
-
     <script src="settings.js"></script>
     <script src="pinch-zoom.override.js"></script>
     <script src="ui-overrides.js"></script>
     <script src="ui-inspector-resize.js"></script>
+    <script src="dialogue-editor.js"></script>
     <script src="main.js"></script>
     <script src="preview.js"></script>
 </body>

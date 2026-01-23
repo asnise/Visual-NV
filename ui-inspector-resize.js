@@ -29,10 +29,33 @@
             // Calculate movement (drag left = increase width)
             // Initial X - Current X = how much we moved left
             const dx = startX - e.clientX;
-            const newWidth = startWidth + dx;
+            let newWidth = startWidth + dx;
 
-            // Apply new width (CSS min/max-width will handle constraints automatically, 
-            // but we can also clamp here if we want smoother behavior)
+            // Enforce constraints
+            // 1. Minimum Inspector Width (css usually has min-width, but good to clamp here)
+            const MIN_INSPECTOR_WIDTH = 200;
+            if (newWidth < MIN_INSPECTOR_WIDTH) newWidth = MIN_INSPECTOR_WIDTH;
+
+            // 2. Maximum Inspector Width (usually 800px or so)
+            const MAX_INSPECTOR_WIDTH = 800;
+            if (newWidth > MAX_INSPECTOR_WIDTH) newWidth = MAX_INSPECTOR_WIDTH;
+
+            // 3. Minimum Stage Width (CRITICAL FIX)
+            // We need to ensure the stage area (workspace width - sidebar - inspector)
+            // remains at least X pixels wide so tabs don't squash.
+            const sidebar = document.querySelector('.sidebar');
+            const workspace = document.querySelector('.workspace');
+
+            if (sidebar && workspace) {
+                const MIN_STAGE_WIDTH = 450; // Adjust as needed to fit tabs comfortably
+                const availableSpace = workspace.clientWidth - sidebar.offsetWidth;
+                const maxAllowedInspector = availableSpace - MIN_STAGE_WIDTH;
+
+                if (newWidth > maxAllowedInspector) {
+                    newWidth = maxAllowedInspector;
+                }
+            }
+
             inspector.style.width = `${newWidth}px`;
         }
 
