@@ -75,21 +75,44 @@ function scheduleAutoSave(reason = "") {
           },
         },
       };
-      localStorage.setItem(VN_LOCAL_PROJECT_KEY, JSON.stringify(payload));
-    } catch (e) { }
-  }, 200);
+      // Use IndexedDB for storage
+      ProjectStore.saveProject(payload)
+        .then(() => {
+          // Optional: console.log("Auto-saved to IndexedDB");
+        })
+        .catch(err => {
+          console.error("Auto-save failed:", err);
+          if (typeof showToast === "function") showToast("Auto-save Failed: " + err.message, "error");
+        });
+
+    } catch (e) { console.error(e); }
+  }, 2000); // Increase debounce to 2s
 }
 
 try {
   window.scheduleAutoSave = scheduleAutoSave;
 } catch (e) { }
 
-function tryRestoreFromLocalStorage() {
+async function restoreProjectData() {
   try {
-    const raw = localStorage.getItem(VN_LOCAL_PROJECT_KEY);
-    if (!raw) return false;
+    // 1. Try Loading from IndexedDB (Preferred)
+    let payload = await ProjectStore.loadProject();
 
-    const payload = JSON.parse(raw);
+    // 2. Migration: If no DB data, check LocalStorage
+    if (!payload) {
+      const raw = localStorage.getItem(VN_LOCAL_PROJECT_KEY);
+      if (raw) {
+        console.log("Migrating data from LocalStorage to IndexedDB...");
+        try {
+          payload = JSON.parse(raw);
+          // Save to DB immediately
+          await ProjectStore.saveProject(payload);
+          // Clear LS to free up space (optional, but good practice if migration successful)
+          // localStorage.removeItem(VN_LOCAL_PROJECT_KEY); 
+        } catch (e) { console.error("Migration parse error", e); }
+      }
+    }
+
     if (!payload || payload.v !== VN_LOCAL_PROJECT_VERSION) return false;
     if (!payload.data || !payload.data.project) return false;
 
@@ -100,6 +123,10 @@ function tryRestoreFromLocalStorage() {
       supportedLanguages = project.languages;
     }
     // --- END ADDITION ---
+
+    // Ensure Assets Exist
+    if (!project.assets.bgm) project.assets.bgm = [];
+    if (!project.assets.voice) project.assets.voice = [];
 
     const ui = payload.data.ui || {};
     if (typeof ui.activeChapterId === "number")
@@ -120,6 +147,7 @@ function tryRestoreFromLocalStorage() {
 
     return true;
   } catch (e) {
+    console.error("Restore failed:", e);
     return false;
   }
 }
@@ -582,7 +610,10 @@ function addCharToSlot(index, charId) {
     charId,
     body: defaultBody,
     face: defaultFace,
+    face: defaultFace,
     anim: "fade_in",
+    animExit: "none",
+    scale: 1,
     scale: 1,
     x: 0,
     y: 0,
@@ -989,11 +1020,7 @@ function unityToHtml(text) {
     "<span class='kv-tag' data-full='{$1:$2}'>$2</span>"
   );
 
-  // 5. Old variable support {var} (fallback if not matching key:value)
-  html = html.replace(
-    /\{([^}:]+)\}/g,
-    '<span style="color:#3b82f6;font-weight:bold;">[$1]</span>',
-  );
+
 
   html = html.replace(/\n/g, "<br>");
   return html;
@@ -1162,7 +1189,7 @@ function renderInspector() {
         <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 4px;">
             <label style="margin:0;">Dialogue Text</label>
             <div style="display:flex; gap:5px; align-items:center;">
-                <select style="width:auto; padding:2px 5px; font-size:11px;" onchange="handleLanguageSelect(this)">
+                <select style="width:auto; padding:2px 5px; font-size:11px; padding: 5px;" onchange="handleLanguageSelect(this)">
                     ${langOpts}
                     <option value="__ADD_NEW__" style="font-weight:bold; color:var(--primary);">+ Add New Language...</option>
                 </select>
@@ -1221,9 +1248,11 @@ function renderInspector() {
           ${(frame.executeFunctions || [])
         .map(
           (val, i) => `
-              <div style="margin-bottom: 4px; display:flex; gap:4px;">
-                  <input class="inspector-input" type="text" value="${val}" oninput="updateExecuteFunction(${i}, this.value)" placeholder="Func()">
-                  <button class="danger small" onclick="deleteExecuteFunction(${i})">X</button>
+              <div style="margin-bottom: 4px; display:flex; flex-wrap: nowrap; align-items:center; border:1px solid var(--border); border-radius:4px; overflow:hidden; background:var(--bg-panel); height: 28px;">
+                  <input class="inspector-input" type="text" value="${val}" oninput="updateExecuteFunction(${i}, this.value)" placeholder="Func()" style="border:none; border-radius:0; flex:1; min-width:0; margin:0; height:100%;">
+                  <button class="danger small" onclick="deleteExecuteFunction(${i})" style="width:28px; height:100%; border-radius:0; display:flex; align-items:center; justify-content:center; padding:0; margin:0; flex-shrink:0; border-left:1px solid var(--border);">
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+                  </button>
               </div>
           `,
         )
@@ -1231,10 +1260,42 @@ function renderInspector() {
           <button class="primary-btn small" onclick="addExecuteFunction()" style="width: 100%;">+ Add Function</button>
       </details>
 
+      <details id="details-audio" class="form-group" style="border-top:1px solid var(--border); margin-top:10px; padding-top:10px;" open>
+        <summary>${iconExpanded}${iconCollapsed}Audio</summary>
+        
+        <!-- BGM -->
+        <div style="margin-bottom:10px;">
+            <label style="font-size:11px;">Background Music (BGM)</label>
+            <select onchange="updateBGM(this.value)">
+                <option value="">(None)</option>
+                ${(project.assets.bgm || []).map(a => `<option value="${a.name}" ${frame.bgm === a.name ? "selected" : ""}>${a.name}</option>`).join("")}
+            </select>
+        </div>
+
+        <!-- Voice Over (Synced to Language) -->
+        <div>
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
+               <label style="font-size:11px; margin:0;">Voice Over (${editorLanguage})</label>
+            </div>
+            <div style="display:flex; gap:5px; align-items:center;">
+                <select onchange="updateVoiceOver(this.value)" style="flex:1; font-size:11px;">
+                    <option value="">(None)</option>
+                    ${(project.assets.voice || []).map(a => {
+          const voMap = (typeof frame.voiceOver === 'object' && frame.voiceOver) ? frame.voiceOver : (typeof frame.voiceOver === 'string' ? { [editorLanguage]: frame.voiceOver } : {});
+          const currentVo = voMap[editorLanguage];
+          const selected = currentVo === a.name ? "selected" : "";
+          return `<option value="${a.name}" ${selected}>${a.name}</option>`;
+        }).join("")}
+                </select>
+            </div>
+            <input type="file" id="voFileInput" style="display:none;" accept="audio/*" onchange="handleVoUpload(this)">
+        </div>
+      </details>
+
       <div class="form-group" style="border-top:1px solid var(--border); margin-top:10px; padding-top:10px;">
         <label>Background</label>
         <select onchange="updateBackground(this.value)">${bgOpts}</select>
-        <button class="primary-btn" onclick="openModal('assetsModal')" style="margin-top:5px;">Manage Assets</button>
+        <button class="primary-btn" onclick="openModal('assetsModal')" style="margin-top:5px;">Assets Manager</button>
       </div>
       <button class="danger" onclick="deleteFrame()" style="margin-top:20px;">Delete Slide</button>`;
     return;
@@ -1272,7 +1333,7 @@ function renderInspector() {
            <input type="checkbox" ${slot.mirror ? "checked" : ""} onchange="updateSlotProp('mirror', this.checked)"> Mirror (Flip X)
         </label>
       </div>
-      <div class="form-group"><label>Animation</label>
+      <div class="form-group"><label>Anim In</label>
         <select onchange="updateSlotProp('anim',this.value)">
             <option value="none" ${slot.anim === "none" ? "selected" : ""}>None</option>
             <option value="fade_in" ${slot.anim === "fade_in" ? "selected" : ""}>Fade In</option>
@@ -1280,7 +1341,75 @@ function renderInspector() {
             <option value="slide_right" ${slot.anim === "slide_right" ? "selected" : ""}>Slide In Right</option>
             <option value="shake" ${slot.anim === "shake" ? "selected" : ""}>Shake</option>
         </select>
+      </div>
+      <div class="form-group"><label>Anim Out</label>
+        <select onchange="updateSlotProp('animExit',this.value)">
+            <option value="none" ${slot.animExit === "none" ? "selected" : ""}>None</option>
+            <option value="fade_out" ${slot.animExit === "fade_out" ? "selected" : ""}>Fade Out</option>
+            <option value="slide_out_left" ${slot.animExit === "slide_out_left" ? "selected" : ""}>Slide Out Left</option>
+            <option value="slide_out_right" ${slot.animExit === "slide_out_right" ? "selected" : ""}>Slide Out Right</option>
+        </select>
       </div>`;
+}
+
+function updateBGM(val) {
+  const frame = getFrame();
+  frame.bgm = val || null;
+  scheduleAutoSave("update_bgm");
+}
+
+function updateVoiceOver(val) {
+  const frame = getFrame();
+  if (typeof frame.voiceOver !== 'object' || !frame.voiceOver) {
+    // Migration or init
+    const oldVal = (typeof frame.voiceOver === 'string') ? frame.voiceOver : null;
+    frame.voiceOver = {};
+    if (oldVal) frame.voiceOver[editorLanguage] = oldVal;
+  }
+
+  if (val) {
+    frame.voiceOver[editorLanguage] = val;
+  } else {
+    delete frame.voiceOver[editorLanguage];
+  }
+
+  scheduleAutoSave("update_voice_over");
+}
+
+function triggerVoUpload() {
+  document.getElementById("voFileInput").click();
+}
+
+function handleVoUpload(input) {
+  const file = input.files[0];
+  if (!file) return;
+
+  const name = prompt("Enter name for this audio:", file.name.split('.')[0]);
+  if (!name) {
+    input.value = "";
+    return;
+  }
+
+  readFileAsDataURL(file, (url, fn) => {
+    // Add to Assets (VOICE ONLY)
+    if (!project.assets.voice) project.assets.voice = [];
+    project.assets.voice.push({ name, url, fileName: fn });
+
+    // Assign to Frame
+    const frame = getFrame();
+    if (typeof frame.voiceOver !== 'object' || !frame.voiceOver) {
+      const oldVal = (typeof frame.voiceOver === 'string') ? frame.voiceOver : null;
+      frame.voiceOver = {};
+      if (oldVal) frame.voiceOver[editorLanguage] = oldVal;
+    }
+    frame.voiceOver[editorLanguage] = name;
+
+    // Render & Save
+    renderAssetModal(); // Update asset list in background
+    renderInspector();  // Update inspector UI
+    scheduleAutoSave("upload_voice_over");
+  });
+  input.value = "";
 }
 
 function initOverlayEditorEvents() {
@@ -2014,18 +2143,453 @@ function uploadLayerImage(type, idx, input) {
   });
 }
 
+// --- Assets Manager (File Explorer Style) ---
+let activeAssetTab = "backgrounds"; // repurpose as 'current category'
+let selectedAsset = null; // Currently selected asset name
+
 function renderAssetModal() {
-  const list = document.getElementById("assetList");
-  list.innerHTML = project.assets.backgrounds
-    .map(
-      (b) => `
-    <div class="asset-item">
-      <div class="asset-thumb" style="background-image:url('${b.url}')"></div>
-      <span>${b.name}</span>
-      <button onclick="removeBackground('${b.name}')">Remove</button>
-    </div>`,
-    )
-    .join("");
+  const modalBody = document.querySelector("#assetsModal .modal-body");
+
+  // Apply Container Styles for 2-Pane Layout
+  modalBody.style.display = "flex";
+  modalBody.style.flexDirection = "row";
+  modalBody.style.overflow = "hidden";
+  modalBody.style.padding = "0"; // Reset padding
+  modalBody.style.flex = "1";
+  modalBody.style.height = "100%";
+
+  const catNames = {
+    "backgrounds": "Backgrounds",
+    "bgm": "BGM (Music)",
+    "voice": "Voice Over"
+  };
+
+  // --- HTML Structure ---
+  modalBody.innerHTML = `
+    <!-- Sidebar -->
+    <div style="width: 200px; background: rgba(0,0,0,0.2); border-right: 1px solid var(--border); display: flex; flex-direction: column; padding: 10px 0;">
+        <div style="font-size: 11px; font-weight: 600; color: var(--text-muted); padding: 0 15px 5px; text-transform: uppercase;">Library</div>
+        <div class="explorer-nav-item ${activeAssetTab === 'backgrounds' ? 'active' : ''}" onclick="switchAssetExplorer('backgrounds')">
+             <span>Backgrounds</span>
+        </div>
+        <div class="explorer-nav-item ${activeAssetTab === 'bgm' ? 'active' : ''}" onclick="switchAssetExplorer('bgm')">
+             <span>BGM</span>
+        </div>
+        <div class="explorer-nav-item ${activeAssetTab === 'voice' ? 'active' : ''}" onclick="switchAssetExplorer('voice')">
+             <span>Voice Over</span>
+        </div>
+    </div>
+
+    <!-- Main Content -->
+    <div style="flex: 1; display: flex; flex-direction: column; min-width: 0; background: var(--bg-body);">
+        <!-- Toolbar -->
+        <div style="height: 40px; border-bottom: 1px solid var(--border); display: flex; align-items: center; padding: 0 15px; background: var(--bg-panel);">
+            <div style="font-weight: 600; font-size: 14px; color: var(--text-main); margin-right: auto;">
+                 ${catNames[activeAssetTab]} 
+                 <span style="font-weight:400; color:var(--text-muted); margin-left:5px; font-size:12px;">(${getAssetCount(activeAssetTab)} items)</span>
+            </div>
+            
+            <div style="display: flex; gap: 8px;">
+                <button class="primary-btn small" onclick="triggerAssetUpload()">
+                    Upload
+                </button>
+                <button class="primary-btn small" onclick="renameSelectedAsset()" ${!selectedAsset ? 'disabled style="opacity:0.5"' : ''}>
+                    Rename
+                </button>
+                <button class="danger small" onclick="deleteSelectedAsset()" ${!selectedAsset ? 'disabled style="opacity:0.5"' : ''}>
+                    Delete
+                </button>
+            </div>
+        </div>
+
+        <!-- File Grid -->
+        <div id="explorerGrid" 
+             ondragover="handleAssetDragOver(event)" 
+             ondragleave="handleAssetDragLeave(event)" 
+             ondrop="handleAssetDrop(event)"
+             onclick="deselectAsset(event)" 
+             style="flex: 1; overflow-y: auto; overflow-x: hidden; padding: 15px; display: grid; grid-template-columns: repeat(auto-fill, minmax(100px, 1fr)); grid-auto-rows: max-content; gap: 10px; align-content: start;">
+            ${renderExplorerItems()}
+        </div>
+    </div>
+    
+    <!-- Hidden Input -->
+    <input type="file" id="assetFileInput" style="display: none" />
+  `;
+
+  // Inject CSS for Nav Items if not present (simple inline style check)
+  if (!document.getElementById('explorerStyles')) {
+    const style = document.createElement('style');
+    style.id = 'explorerStyles';
+    style.textContent = `
+          .explorer-nav-item {
+              padding: 8px 15px;
+              cursor: pointer;
+              color: var(--text-muted);
+              font-size: 13px;
+              display: flex;
+              align-items: center;
+              transition: background 0.1s, color 0.1s;
+          }
+          .explorer-nav-item:hover {
+              background: rgba(255,255,255,0.05);
+              color: var(--text-main);
+          }
+          .explorer-nav-item.active {
+              background: var(--primary-color);
+              color: white;
+          }
+          .explorer-item {
+              display: flex;
+              flex-direction: column;
+              align-items: center;
+              padding: 8px;
+              border-radius: 4px;
+              border: 1px solid transparent;
+              cursor: pointer;
+              transition: background 0.1s;
+          }
+          .explorer-item:hover {
+              background: rgba(255,255,255,0.05);
+          }
+          .explorer-item.selected {
+              background: rgba(var(--primary-rgb), 0.2);
+              border-color: var(--primary-color);
+          }
+          .explorer-thumb {
+              width: 100%;
+              aspect-ratio: 1;
+              background-color: #111;
+              border-radius: 4px;
+              margin-bottom: 6px;
+              background-size: cover;
+              background-position: center;
+              display: flex;
+              align-items: center;
+              justify-content: center;
+              position: relative;
+          }
+          .explorer-label {
+              font-size: 11px;
+              text-align: center;
+              color: var(--text-main);
+              width: 100%;
+              overflow: hidden;
+              text-overflow: ellipsis;
+              white-space: nowrap;
+          }
+      `;
+    document.head.appendChild(style);
+  }
+}
+
+function getAssetCount(type) {
+  if (type === 'backgrounds') return project.assets.backgrounds.length;
+  if (type === 'bgm') return (project.assets.bgm || []).length;
+  if (type === 'voice') return (project.assets.voice || []).length;
+  return 0;
+}
+
+function switchAssetExplorer(tab) {
+  activeAssetTab = tab;
+  selectedAsset = null; // Reset selection on switch
+  renderAssetModal();
+}
+
+function renderExplorerItems() {
+  let items = [];
+  if (activeAssetTab === 'backgrounds') items = project.assets.backgrounds;
+  else if (activeAssetTab === 'bgm') items = project.assets.bgm || [];
+  else if (activeAssetTab === 'voice') items = project.assets.voice || [];
+
+  if (items.length === 0) {
+    return `<div style="grid-column: 1 / -1; text-align: center; color: var(--text-muted); padding-top: 50px; font-style: italic;">No items found. Upload one!</div>`;
+  }
+
+  return items.map(item => {
+    const isSelected = selectedAsset === item.name;
+    // Thumbnail logic
+    let thumbContent = '';
+    if (activeAssetTab === 'backgrounds') {
+      thumbContent = `style="background-image: url('${item.url}')"`;
+    } else {
+      // Audio Icon with Play overlay if selected? logic can be simple icon
+      thumbContent = `><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#666" stroke-width="2"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>`;
+    }
+
+    return `
+            <div class="explorer-item ${isSelected ? 'selected' : ''}" onclick="selectAsset(event, '${item.name}')" ondblclick="previewAsset('${item.name}')">
+                <div class="explorer-thumb" ${thumbContent}${activeAssetTab !== 'backgrounds' ? '' : '>'}
+                   ${activeAssetTab !== 'backgrounds' ? `<div style="position:absolute; bottom:2px; right:2px; font-size:10px; color:#666;">🎵</div>` : ''}
+                </div>
+                <div class="explorer-label" title="${item.name}">${item.name}</div>
+            </div>
+        `;
+  }).join("");
+}
+
+function selectAsset(e, name) {
+  e.stopPropagation();
+  selectedAsset = (selectedAsset === name) ? null : name; // Toggle if needed, or just set
+  if (selectedAsset) {
+    // Play audio preview if audio?
+    if (activeAssetTab !== 'backgrounds') playAudioPreview(name);
+  } else {
+    stopAudioPreview();
+  }
+  renderAssetModal();
+}
+
+function deselectAsset(e) {
+  if (e.target.id === 'explorerGrid') {
+    selectedAsset = null;
+    renderAssetModal();
+    stopAudioPreview();
+  }
+}
+
+// Drag and Drop Logic
+function handleAssetDragOver(e) {
+  e.preventDefault();
+  e.stopPropagation();
+  const grid = document.getElementById("explorerGrid");
+  if (grid) grid.style.background = "rgba(var(--primary-rgb), 0.1)";
+}
+
+function handleAssetDragLeave(e) {
+  e.preventDefault();
+  e.stopPropagation();
+  const grid = document.getElementById("explorerGrid");
+  if (grid) grid.style.background = "var(--bg-body)";
+}
+
+function handleAssetDrop(e) {
+  e.preventDefault();
+  e.stopPropagation();
+  const grid = document.getElementById("explorerGrid");
+  if (grid) grid.style.background = "var(--bg-body)";
+
+  const files = Array.from(e.dataTransfer.files);
+  if (!files || files.length === 0) return;
+
+  files.forEach(file => {
+    // Validate File Type
+    if (activeAssetTab === 'backgrounds') {
+      if (!file.type.startsWith("image/")) {
+        console.warn("Skipped non-image file for backgrounds:", file.name);
+        return;
+      }
+    } else {
+      // Audio tabs (bgm, voice)
+      if (!file.type.startsWith("audio/")) {
+        console.warn("Skipped non-audio file for " + activeAssetTab + ":", file.name);
+        return;
+      }
+    }
+
+    // Auto-name (no prompt for bulk)
+    const name = file.name.split('.')[0];
+
+    readFileAsDataURL(file, (url, fn) => {
+      if (activeAssetTab === "backgrounds") {
+        project.assets.backgrounds.push({ name, url, fileName: fn });
+      } else if (activeAssetTab === "bgm") {
+        if (!project.assets.bgm) project.assets.bgm = [];
+        project.assets.bgm.push({ name, url, fileName: fn });
+      } else if (activeAssetTab === "voice") {
+        if (!project.assets.voice) project.assets.voice = [];
+        project.assets.voice.push({ name, url, fileName: fn });
+      }
+
+      scheduleAutoSave("add_" + activeAssetTab);
+      renderAssetModal();
+    });
+  });
+}
+
+function triggerAssetUpload() {
+  const input = document.getElementById('assetFileInput');
+  if (activeAssetTab === 'backgrounds') input.accept = "image/*";
+  else input.accept = "audio/*";
+
+  input.onchange = (e) => handleAssetUpload(e, activeAssetTab);
+  input.click();
+}
+
+function handleAssetUpload(e, type) {
+  const file = e.target.files[0];
+  if (!file) return;
+  const name = prompt(`Enter name for this asset:`, file.name.split('.')[0]);
+  if (!name) return;
+
+  readFileAsDataURL(file, (url, fn) => {
+    if (type === "backgrounds") {
+      project.assets.backgrounds.push({ name, url, fileName: fn });
+      scheduleAutoSave("add_background");
+    } else if (type === "bgm") {
+      if (!project.assets.bgm) project.assets.bgm = [];
+      project.assets.bgm.push({ name, url, fileName: fn });
+      scheduleAutoSave("add_bgm");
+    } else if (type === "voice") {
+      if (!project.assets.voice) project.assets.voice = [];
+      project.assets.voice.push({ name, url, fileName: fn });
+      scheduleAutoSave("add_voice");
+    }
+    renderAssetModal();
+  });
+  e.target.value = "";
+}
+
+function renameSelectedAsset() {
+  if (!selectedAsset) return;
+  const oldName = selectedAsset;
+  const newName = prompt("Rename asset:", oldName);
+  if (!newName || newName === oldName) return;
+
+  // TODO: Update references (this is tricky, simplified for now to just update storage)
+  // Actually existing rename logic handles ref update? No, existing logic was simple.
+  // We will just rename the asset entry for now.
+
+  let list = [];
+  if (activeAssetTab === 'backgrounds') list = project.assets.backgrounds;
+  else if (activeAssetTab === 'bgm') list = project.assets.bgm;
+  else if (activeAssetTab === 'voice') list = project.assets.voice;
+
+  const mk = list.find(x => x.name === oldName);
+  if (mk) {
+    mk.name = newName;
+    scheduleAutoSave(`rename_${activeAssetTab}`);
+    selectedAsset = newName; // Keep selection
+    renderAssetModal();
+  }
+}
+
+function deleteSelectedAsset() {
+  if (!selectedAsset) return;
+  if (!confirm(`Delete '${selectedAsset}'?`)) return;
+
+  if (activeAssetTab === 'backgrounds') {
+    project.assets.backgrounds = project.assets.backgrounds.filter(x => x.name !== selectedAsset);
+    scheduleAutoSave("delete_bg");
+  } else if (activeAssetTab === 'bgm') {
+    project.assets.bgm = project.assets.bgm.filter(x => x.name !== selectedAsset);
+    scheduleAutoSave("delete_bgm");
+  } else if (activeAssetTab === 'voice') {
+    project.assets.voice = project.assets.voice.filter(x => x.name !== selectedAsset);
+    scheduleAutoSave("delete_voice");
+  }
+  selectedAsset = null;
+  renderAssetModal();
+}
+
+// Audio Preview Helper
+let previewAudioObj = null;
+function playAudioPreview(name) {
+  stopAudioPreview();
+  let list = (activeAssetTab === 'bgm') ? project.assets.bgm : project.assets.voice;
+  const asset = list.find(a => a.name === name);
+  if (asset) {
+    previewAudioObj = new Audio(asset.url);
+    previewAudioObj.volume = 0.5;
+    previewAudioObj.play();
+  }
+}
+
+function stopAudioPreview() {
+  if (previewAudioObj) {
+    previewAudioObj.pause();
+    previewAudioObj = null;
+  }
+}
+
+function previewAsset(name) {
+  // Double click action
+  if (activeAssetTab === 'backgrounds') {
+    // maybe show in modal or something? For now do nothing.
+  } else {
+    playAudioPreview(name);
+  }
+}
+
+
+let currentAudio = null;
+function toggleAudioPreview(btn, name) {
+  if (currentAudio && currentAudio.name === name) {
+    currentAudio.audio.pause();
+    currentAudio = null;
+    btn.textContent = "▶";
+    return;
+  }
+  if (currentAudio) {
+    currentAudio.audio.pause();
+    document.querySelectorAll("#assetList button").forEach(b => { if (b.textContent === "■") b.textContent = "▶"; });
+  }
+
+  const asset = project.assets.audio.find(a => a.name === name);
+  if (!asset) return;
+
+  const audio = new Audio(asset.url);
+  audio.play();
+  audio.onended = () => {
+    btn.textContent = "▶";
+    currentAudio = null;
+  };
+  currentAudio = { name, audio };
+  btn.textContent = "■";
+}
+
+function removeAudio(name) {
+  if (!confirm("Remove this audio?")) return;
+  project.assets.audio = project.assets.audio.filter(a => a.name !== name);
+  renderAssetModal();
+  scheduleAutoSave("remove_audio");
+}
+
+function renameBackground(oldName) {
+  const newName = prompt("Enter new name for background:", oldName);
+  if (!newName || newName === oldName) return;
+
+  // Check duplicates
+  if (project.assets.backgrounds.some(b => b.name === newName)) {
+    return alert("A background with this name already exists.");
+  }
+
+  // Update Asset
+  const bg = project.assets.backgrounds.find(b => b.name === oldName);
+  if (bg) bg.name = newName;
+
+  // Update References
+  project.chapters.forEach(ch => {
+    ch.frames.forEach(f => {
+      if (f.background === oldName) {
+        f.background = newName;
+      }
+    });
+  });
+
+  renderAssetModal();
+  renderInspector(); // Refresh properties if current frame uses this bg
+  scheduleAutoSave("rename_background");
+}
+
+function triggerBgReplacement(name) {
+  const input = document.getElementById("bgReplaceInput");
+  input.onchange = (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    readFileAsDataURL(file, (url, fn) => {
+      const bg = project.assets.backgrounds.find(b => b.name === name);
+      if (bg) {
+        bg.url = url;
+        bg.fileName = fn;
+        renderAssetModal();
+        renderStage(); // Update stage if current frame uses this bg
+        scheduleAutoSave("replace_background_image");
+      }
+    });
+    input.value = ""; // Reset
+  };
+  input.click();
 }
 
 function removeBackground(name) {
@@ -2042,16 +2606,20 @@ function renderChapterMgmt() {
   list.innerHTML = project.chapters
     .map(
       (ch) => `
-    <div class="list-item ${ch.id === activeChapterId ? "selected" : ""}" onclick="loadChapter(${ch.id})">
-      <input type="text" value="${ch.title}" onchange="project.chapters.find(c => c.id === ${ch.id}).title = this.value">
-      <button class="danger" onclick="event.stopPropagation(); deleteChapter(${ch.id})">Delete</button>
+    <div class="list-item ${ch.id === activeChapterId ? "selected" : ""}" style="cursor: default; gap: 10px;">
+      <input type="text" value="${ch.title}" 
+             onclick="event.stopPropagation()" 
+             onchange="project.chapters.find(c => c.id === ${ch.id}).title = this.value; scheduleAutoSave('rename_chapter');"
+             style="flex:1;">
+      <button class="primary-btn small" onclick="loadChapter(${ch.id}); closeModal('chapterModal');">Open</button>
+      <button class="danger small" onclick="deleteChapter(${ch.id})">Delete</button>
     </div>`,
     )
     .join("");
 }
 
-function init() {
-  tryRestoreFromLocalStorage();
+async function init() {
+  await restoreProjectData();
 
   renderCastPalette();
 
@@ -2062,6 +2630,8 @@ function init() {
       name: "default_bg",
       url: "",
     });
+
+  if (!project.assets.audio) project.assets.audio = [];
 
   initOverlayEditorEvents();
 
@@ -2095,7 +2665,25 @@ function init() {
   if (typeof initSettingsModal === "function") {
     initSettingsModal();
   }
+  if (typeof initSettingsModal === "function") {
+    initSettingsModal();
+  }
   initStageViewEvents();
+  initFilmstripEvents();
+}
+
+function initFilmstripEvents() {
+  const filmstrip = document.getElementById("filmstrip");
+  if (filmstrip) {
+    filmstrip.addEventListener(
+      "wheel",
+      (e) => {
+        e.preventDefault();
+        filmstrip.scrollLeft += e.deltaY;
+      },
+      { passive: false }
+    );
+  }
 }
 
 function initStageViewEvents() {
@@ -2221,7 +2809,7 @@ function hideLoading() {
 function newProject() {
   if (confirm("Create a new project? Any unsaved changes will be lost.")) {
     project = {
-      assets: { backgrounds: [] },
+      assets: { backgrounds: [], bgm: [], voice: [] },
       characters: [],
       chapters: [
         {

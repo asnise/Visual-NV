@@ -382,6 +382,15 @@
         if (!nodeIdSet.has(safeId(l.to.nodeId))) return false;
 
         if (safeId(l.to.portId) !== "in") return false;
+
+        // Check if from-port exists on the source node (e.g. 'next' port disappears if choices exist)
+        const fromNode = getNode(l.from.nodeId);
+        if (fromNode) {
+          const ports = getPortsForNode(fromNode);
+          const valid = ports.outputs.some((p) => safeId(p.id) === safeId(l.from.portId));
+          if (!valid) return false;
+        }
+
         return true;
       });
 

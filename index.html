@@ -43,7 +43,7 @@
                         Chapter Manager
                     </button>
                     <button onclick="openModal('assetsModal')">
-                        Background Assets
+                        Library Assets
                     </button>
                     <hr />
                     <button onclick="openSettingsModal()">Settings</button>
@@ -198,9 +198,10 @@
     </div>
 
     <div id="assetsModal" class="modal-overlay">
-        <div class="modal-box">
+        <div class="modal-box"
+            style="width: 800px; max-width: 90vw; height: 600px; display: flex; flex-direction: column;">
             <div class="modal-header">
-                <h3>Background Assets</h3>
+                <h3>Library Assets</h3>
                 <button onclick="closeModal('assetsModal')">&times;</button>
             </div>
             <div class="modal-body">
@@ -568,6 +569,7 @@
     <script src="ui-overrides.js"></script>
     <script src="ui-inspector-resize.js"></script>
     <script src="dialogue-editor.js"></script>
+    <script src="storage-db.js"></script>
     <script src="main.js"></script>
     <script src="preview.js"></script>
 </body>
