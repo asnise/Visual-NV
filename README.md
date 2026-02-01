@@ -10,6 +10,7 @@
 - **settings.js**: App settings, theme and UI scale handling.
 - **ui-overrides.js**: UI helpers (toasts, modals, loading) - exposes `showToast`, `showLoading`, `hideLoading` globally.
 - **main.js**: Core editor logic: project model, editor actions, renderers, import/export, stage and inspector.
+- **storage-db.js**: Adapter for IndexedDB (handles large project storage).
 - **preview.js**: Runtime preview player and dialog typewriter logic.
 - **node-graph-v2.js**: Storyline node graph editor for start/end, links and auto-apply to frames.
 
@@ -20,9 +21,13 @@
 
 **Exporting & Importing Project JSON**:
 - Export: Use the UI File → Export JSON (or the `exportJSON()` action in the app) to download the full project as a JSON file.
-- Save: `saveJSON()` writes the project file using the app UI (uses localStorage auto-save by default).
+- Save: `saveJSON()` writes the project file using the app UI (uses **IndexedDB** auto-save by default to support large files).
 - Import: File → Import JSON or the file input calls `importJSON(e)` which merges/validates project content.
-- Images are embedded as data URLs in the exported JSON (optimized when `optimizeProjectImages()` is run).
+- Images and Audio are embedded as data URLs in the exported JSON.
+
+**New Features**:
+- **Library Assets**: File Explorer-style manager for Backgrounds, BGM, and Voice Over. Supports **Drag & Drop** upload.
+- **IndexedDB**: Auto-save now uses IndexedDB, removing the 5MB storage limit.
 
 **Processing the Exported File**:
 - The exported JSON contains top-level keys: `assets`, `characters`, `chapters`.
@@ -38,7 +43,7 @@
 **Development Notes & Further Work**:
 - Node Graph: `node-graph-v2.js` maintains a local node graph and can apply link topology to frames. Use `openNodeGraphV2()` from the UI.
 - Separation of concerns: Consider extracting preview renderer into a small library so external apps can reuse it (e.g., `vn-preview.js`).
-- Save/Load: Project uses localStorage key `vnEditorProject_v1`. To add cloud sync, implement upload/download endpoints and serializing images to blobs.
+- Save/Load: Project and Library Assets are auto-saved to **IndexedDB** (`VisualVN_DB`). Legacy `localStorage` data is auto-migrated.
 - Tests: Add unit tests for `applyGraphLinksToFrames()` and for JSON import/validation.
 
 **Troubleshooting**:
@@ -69,6 +74,7 @@
 - **settings.js**: จัดการการตั้งค่าแอป (ธีม, ขนาด UI)
 - **ui-overrides.js**: ฟังก์ชันช่วย UI (toast, modal, loading) - ให้ `showToast`/`showLoading`/`hideLoading` เป็น global
 - **main.js**: โลจิกหลักของ editor (โมเดลโปรเจกต์, การเรนเดอร์, นำเข้า/ส่งออก)
+- **storage-db.js**: จัดการฐานข้อมูล IndexedDB สำหรับเก็บข้อมูลขนาดใหญ่
 - **preview.js**: ตัวเล่นตัวอย่าง (typewriter, แสดงตัวละคร)
 - **node-graph-v2.js**: ตัวแก้ไขโหนดสำหรับ storyline
 
@@ -80,7 +86,10 @@
 **การส่งออก-นำเข้า JSON**:
 - ส่งออก: ใช้เมนูหรือฟังก์ชัน `exportJSON()` เพื่อดาวน์โหลดไฟล์โปรเจกต์ทั้งหมด
 - นำเข้า: เมนูนำเข้าเรียก `importJSON(e)` ซึ่งจะทำการตรวจสอบและรวมข้อมูลเข้ากับโปรเจกต์
-- รูปภาพจะถูกฝังเป็น data URL ใน JSON (มีการบีบอัดเมื่อเรียก `optimizeProjectImages()`)
+- รูปภาพและเสียงจะถูกฝังเป็น data URL ใน JSON
+- **ฟีเจอร์ใหม่**:
+  - **Library Assets**: จัดการไฟล์แบบ File Explorer รองรับ **Drag & Drop**
+  - **IndexedDB**: ระบบบันทึกอัตโนมัติรองรับไฟล์ขนาดใหญ่ (ไม่จำกัดแค่ 5MB)
 
 **การประมวลผลไฟล์ที่ส่งออก**:
 - JSON ประกอบด้วย `assets`, `characters`, `chapters`
