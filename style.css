@@ -2158,4 +2158,13 @@ input:checked+.slider:before {
     pointer-events: none;
     z-index: 100;
 }
-#charCounter { font-feature-settings: 'tnum'; transition: color 0.2s; } #charCounter.over-limit { color: #fe2c2c; font-weight: bold; }
+
+#charCounter {
+    font-feature-settings: 'tnum';
+    transition: color 0.2s;
+}
+
+#charCounter.over-limit {
+    color: #fe2c2c;
+    font-weight: bold;
+}

@@ -20,10 +20,24 @@ function updateCharCounter(text) {
     const counterEl = document.getElementById("charCounter");
     if (counterEl) {
         counterEl.textContent = `${count}/${limit}`;
+
+        const saveBtn = document.getElementById("btnSaveDialogue");
         if (count > limit) {
             counterEl.classList.add("over-limit");
+            if (saveBtn) {
+                saveBtn.disabled = true;
+                saveBtn.classList.add("disabled");
+                saveBtn.style.opacity = "0.5";
+                saveBtn.style.cursor = "not-allowed";
+            }
         } else {
             counterEl.classList.remove("over-limit");
+            if (saveBtn) {
+                saveBtn.disabled = false;
+                saveBtn.classList.remove("disabled");
+                saveBtn.style.opacity = "1";
+                saveBtn.style.cursor = "pointer";
+            }
         }
     }
 }
@@ -33,14 +47,9 @@ function toggleEditorMode(isRich) {
     const input = document.getElementById("modalTextInput");
     const toolbar = document.querySelector(".rte-toolbar-horizontal");
 
-    // Disable/Enable Toolbar based on mode
-    if (!isRichMode) {
-        toolbar.style.opacity = "0.5";
-        toolbar.style.pointerEvents = "none";
-    } else {
-        toolbar.style.opacity = "1";
-        toolbar.style.pointerEvents = "auto";
-    }
+    // Toolbar always enabled
+    toolbar.style.opacity = "1";
+    toolbar.style.pointerEvents = "auto";
 
     if (!isRichMode) {
         // Switch to Raw: Convert HTML visual to Unity String
@@ -140,7 +149,8 @@ function saveTextEditor() {
     renderInspector();
 }
 
-function showColorPicker(onSelect) {
+
+function showSyntaxInput(onConfirm) {
     const uiModal = document.getElementById("uiGenericModal");
     const uiTitle = document.getElementById("uiModalTitle");
     const uiMessage = document.getElementById("uiModalMessage");
@@ -150,82 +160,62 @@ function showColorPicker(onSelect) {
 
     if (!uiModal) return;
 
-    uiTitle.textContent = "Select Color";
-    uiMessage.textContent = "Choose a color or enter hex code:";
+    uiTitle.textContent = "Insert Syntax Tag";
+    uiMessage.textContent = "Enter Key and Value:";
     uiContent.innerHTML = "";
-
-    btnConfirm.style.display = "none";
-
-    const grid = document.createElement("div");
-    grid.style.display = "grid";
-    grid.style.gridTemplateColumns = "repeat(5, 1fr)";
-    grid.style.gap = "8px";
-    grid.style.marginBottom = "15px";
-
-    const colors = [
-        "#ffffff", "#000000", "#ef4444", "#f97316", "#f59e0b",
-        "#10b981", "#3b82f6", "#6366f1", "#8b5cf6", "#ec4899",
-        "#64748b", "#a1a1aa", "#fee2e2", "#dbeafe", "#d1fae5",
-    ];
-
-    colors.forEach((c) => {
-        const btn = document.createElement("div");
-        btn.style.backgroundColor = c;
-        btn.style.height = "32px";
-        btn.style.borderRadius = "4px";
-        btn.style.cursor = "pointer";
-        btn.style.border = "1px solid #ddd";
-        btn.title = c;
-
-        btn.onclick = () => {
-            onSelect(c);
-            uiModal.style.display = "none";
-            btnConfirm.style.display = "inline-block";
-        };
-        grid.appendChild(btn);
-    });
-
-    uiContent.appendChild(grid);
 
     const wrapper = document.createElement("div");
     wrapper.style.display = "flex";
-    wrapper.style.gap = "8px";
-    wrapper.style.alignItems = "center";
+    wrapper.style.flexDirection = "column";
+    wrapper.style.gap = "10px";
 
-    const inputEl = document.createElement("input");
-    inputEl.type = "text";
-    inputEl.className = "ui-modal-input";
-    inputEl.style.margin = "0";
-    inputEl.style.flex = "1";
-    inputEl.placeholder = "Hex (#RRGGBB)";
+    const keyInput = document.createElement("input");
+    keyInput.type = "text";
+    keyInput.className = "ui-modal-input";
+    keyInput.style.margin = "0";
+    keyInput.placeholder = "Key (e.g. speed)";
 
-    const okBtn = document.createElement("button");
-    okBtn.className = "primary-btn";
-    okBtn.textContent = "Use Hex";
-    okBtn.onclick = () => {
-        if (inputEl.value) {
-            onSelect(inputEl.value);
-            uiModal.style.display = "none";
-            btnConfirm.style.display = "inline-block";
-        }
-    };
+    const valueInput = document.createElement("input");
+    valueInput.type = "text";
+    valueInput.className = "ui-modal-input";
+    valueInput.style.margin = "0";
+    valueInput.placeholder = "Value (e.g. 0.5)";
 
-    wrapper.appendChild(inputEl);
-    wrapper.appendChild(okBtn);
+    wrapper.appendChild(keyInput);
+    wrapper.appendChild(valueInput);
     uiContent.appendChild(wrapper);
 
     uiModal.style.display = "flex";
-    inputEl.focus();
+    keyInput.focus();
+
+    btnConfirm.onclick = () => {
+        if (keyInput.value && valueInput.value) {
+            onConfirm(keyInput.value, valueInput.value);
+            uiModal.style.display = "none";
+        } else {
+            window.showToast("Both Key and Value are required", "error");
+        }
+    };
 
     btnCancel.onclick = () => {
         uiModal.style.display = "none";
-        btnConfirm.style.display = "inline-block";
     };
 }
+
 
 function editorInsertTag(command) {
     const input = document.getElementById("modalTextInput");
     input.focus();
+
+    // Helper to insert raw tags around selection
+    const insertRawTag = (startTag, endTag) => {
+        const selection = window.getSelection();
+        if (!selection.rangeCount) return;
+        const range = selection.getRangeAt(0);
+        const selectedText = range.toString();
+        const replacement = `${startTag}${selectedText}${endTag}`;
+        document.execCommand("insertText", false, replacement);
+    };
 
     if (command === "color") {
         let colorInput = document.getElementById("hiddenColorInput");
@@ -241,7 +231,11 @@ function editorInsertTag(command) {
             colorInput.addEventListener("change", (e) => {
                 const color = e.target.value;
                 input.focus();
-                document.execCommand("foreColor", false, color);
+                if (!isRichMode) {
+                    insertRawTag(`<color=${color}>`, `</color>`);
+                } else {
+                    document.execCommand("foreColor", false, color);
+                }
                 onModalTextChange();
             });
         }
@@ -253,14 +247,41 @@ function editorInsertTag(command) {
     if (command === "size") {
         const size = prompt("Enter font size (e.g., 18, 24, 32):");
         if (size) {
-            document.execCommand("fontSize", false, "7");
-            const fontElements = input.querySelectorAll('font[size="7"]');
-            fontElements.forEach((el) => {
-                el.removeAttribute("size");
-                el.style.fontSize = size + "px";
-            });
+            input.focus();
+            if (!isRichMode) {
+                insertRawTag(`<size=${size}>`, `</size>`);
+            } else {
+                document.execCommand("fontSize", false, "7");
+                const fontElements = input.querySelectorAll('font[size="7"]');
+                fontElements.forEach((el) => {
+                    el.removeAttribute("size");
+                    el.style.fontSize = size + "px";
+                });
+            }
             onModalTextChange();
         }
+        return;
+    }
+
+    if (command === "syntax") {
+        // Save the current selection range before opening the modal
+        const selection = window.getSelection();
+        const savedRange = selection.rangeCount > 0 ? selection.getRangeAt(0) : null;
+
+        showSyntaxInput((key, value) => {
+            const tag = `{${key}:${value}}`;
+            input.focus();
+
+            // Restore the selection range
+            if (savedRange) {
+                const sel = window.getSelection();
+                sel.removeAllRanges();
+                sel.addRange(savedRange);
+            }
+
+            document.execCommand("insertText", false, tag);
+            onModalTextChange();
+        });
         return;
     }
 
@@ -270,10 +291,22 @@ function editorInsertTag(command) {
         return;
     }
 
-    if (command === "b") document.execCommand("bold", false, null);
-    if (command === "i") document.execCommand("italic", false, null);
-    if (command === "u") document.execCommand("underline", false, null);
-    if (command === "s") document.execCommand("strikethrough", false, null);
+    if (command === "b") {
+        if (!isRichMode) insertRawTag("<b>", "</b>");
+        else document.execCommand("bold", false, null);
+    }
+    if (command === "i") {
+        if (!isRichMode) insertRawTag("<i>", "</i>");
+        else document.execCommand("italic", false, null);
+    }
+    if (command === "u") {
+        if (!isRichMode) insertRawTag("<u>", "</u>");
+        else document.execCommand("underline", false, null);
+    }
+    if (command === "s") {
+        if (!isRichMode) insertRawTag("<s>", "</s>");
+        else document.execCommand("strikethrough", false, null);
+    }
 
     onModalTextChange();
 }

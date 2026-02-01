@@ -518,7 +518,7 @@
                     </button>
                     <div class="rte-sep"></div>
                     <button class="rte-btn" onclick="editorInsertTag('color')" title="Text Color">
-                        <span style="color: #3b82f6; font-weight: bold">Color</span>
+                        <span style="font-weight: bold">Color</span>
                     </button>
 
                     <button class="rte-btn" onclick="editorInsertTag('size')" title="Font Size">
@@ -526,11 +526,11 @@
                     </button>
                     <div class="rte-sep"></div>
                     <button class="rte-btn" onclick="editorInsertTag('syntax')" title="Syntax (Hidden Text)">
-                        <span style="font-weight: bold; color: #f97316;">Syn</span>
+                        <span style="font-weight: bold;">Syn</span>
                     </button>
                     <div class="rte-sep"></div>
                     <button class="rte-btn" onclick="editorInsertTag('removeFormat')" title="Clear Formatting">
-                        <span style="font-weight: bold">✕</span>
+                        <span style="font-weight: bold">Clear All Syntex</span>
                     </button>
 
                 </div>
@@ -539,16 +539,16 @@
                     placeholder="Type dialogue text here..." oninput="onModalTextChange()"></div>
             </div>
 
+            <div style="padding: 0 20px 10px 20px; text-align: right; font-size: 11px; color: var(--text-muted);">
+                <span id="charCounter">0/300</span>
+            </div>
             <div class="modal-footer">
                 <button class="danger" onclick="closeModal('textEditorModal')" style="margin-right: auto">
                     Cancel
                 </button>
-                <button class="primary-btn" onclick="saveTextEditor()">
+                <button class="primary-btn" id="btnSaveDialogue" onclick="saveTextEditor()">
                     Save &amp; Close
                 </button>
-            </div>
-            <div style="padding: 0 20px 10px 20px; text-align: right; font-size: 11px; color: var(--text-muted);">
-                <span id="charCounter">0/300</span>
             </div>
         </div>
     </div>
