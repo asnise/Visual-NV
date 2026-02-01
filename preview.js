@@ -3,6 +3,19 @@ let previewCurrentIndex = 0;
 let previousCharRects = new Map();
 let typingTimer = null;
 let lastMainFrameIndex = -1;
+let previewVoiceAudio = new Audio(); // Dedicated audio for preview VO
+
+function playPreviewVoice(url) {
+  previewVoiceAudio.pause();
+  previewVoiceAudio.currentTime = 0;
+  previewVoiceAudio.src = url;
+  previewVoiceAudio.play().catch(e => console.warn("VO Auto-play prevented:", e));
+}
+
+function stopPreviewVoice() {
+  previewVoiceAudio.pause();
+  previewVoiceAudio.currentTime = 0;
+}
 
 function updatePreviewRatio() {
   const vp = document.getElementById("pViewport");
@@ -82,6 +95,24 @@ function renderPreviewFrame() {
 
   // --- เริ่มส่วนที่แก้ไข ---
   let text = getLocalizedFrameText(frame) || "";
+
+  // Play Voice Over if available
+  // Play Voice Over if available, else stop previous
+  if (frame.voiceOver && typeof frame.voiceOver === "object") {
+    const voName = frame.voiceOver[editorLanguage];
+    if (voName) {
+      const voAsset = project.assets.voice.find(a => a.name === voName);
+      if (voAsset && voAsset.url) {
+        playPreviewVoice(voAsset.url);
+      } else {
+        stopPreviewVoice(); // Asset not found/valid
+      }
+    } else {
+      stopPreviewVoice(); // No VO for this lang
+    }
+  } else {
+    stopPreviewVoice(); // No VO object
+  }
 
   // เรียกใช้ unityToHtml (จาก main.js) เพื่อแปลง Tag สีและอื่นๆ
   if (typeof unityToHtml === "function") {
@@ -371,7 +402,19 @@ function openPreview() {
   updatePreviewRatio();
   renderPreviewFrame();
   window.addEventListener("resize", updatePreviewRatio);
+
+  // Ensure VO stops when closing (monkey-patching closeModal might be cleaner, but works here for now)
+  const originalClose = window.closeModal;
+  // We assume closeModal handles 'previewModal' specifically or generic
+  // But actually, we need to catch when the modal is closed.
+  // Easiest is to add an observer or just hook the close button in HTML?
+  // Or check if 'previewModal' is hidden.
+  // A cleaner way: In 'nextPreview' end logic and 'closeModal' usage below.
 }
+
+// Hook into specific close actions in nextPreview is already done?
+// Let's look at nextPreview, it calls closeModal.
+// We should make sure stopPreviewVoice is called there.
 
 function nextPreview() {
   const chapter = getChapter();
@@ -390,6 +433,7 @@ function nextPreview() {
       String(currentFrame.attributes.next).trim();
 
     if (!nextId) {
+      stopPreviewVoice();
       closeModal("previewModal");
       window.removeEventListener("resize", updatePreviewRatio);
       if (typingTimer) clearTimeout(typingTimer);
@@ -424,6 +468,7 @@ function nextPreview() {
     String(currentFrame.attributes.next).trim();
 
   if (!nextId) {
+    stopPreviewVoice();
     closeModal("previewModal");
     window.removeEventListener("resize", updatePreviewRatio);
     if (typingTimer) clearTimeout(typingTimer);

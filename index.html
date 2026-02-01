@@ -313,7 +313,8 @@
         <div class="modal-box large-modal">
             <div class="modal-header">
                 <h3>Preview Player</h3>
-                <button onclick="closeModal('previewModal')">
+                <button
+                    onclick="if(typeof stopPreviewVoice === 'function') stopPreviewVoice(); closeModal('previewModal')">
                     &times;
                 </button>
             </div>
