@@ -620,6 +620,11 @@ button[disabled],
     box-shadow: 0 2px 8px rgba(59, 130, 246, 0.2);
 }
 
+.film-frame.selected {
+    border-color: var(--primary);
+    background: var(--selected-bg);
+}
+
 .thumb-preview {
     flex: 1;
     background: var(--hover-bg);
@@ -2167,4 +2172,89 @@ input:checked+.slider:before {
 #charCounter.over-limit {
     color: #fe2c2c;
     font-weight: bold;
+}
+
+/* Mapping Table Table Styles */
+.mapping-table {
+    width: 100%;
+    border-collapse: separate;
+    border-spacing: 0;
+    font-size: 13px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md);
+    overflow: hidden;
+}
+
+.mapping-table th {
+    text-align: left;
+    padding: 10px 12px;
+    background: var(--bg-secondary);
+    border-bottom: 1px solid var(--border);
+    color: var(--text-muted);
+    font-weight: 600;
+    position: sticky;
+    top: 0;
+    z-index: 10;
+    text-transform: uppercase;
+    font-size: 11px;
+    letter-spacing: 0.5px;
+}
+
+.mapping-table td {
+    padding: 8px 12px;
+    border-bottom: 1px solid var(--border-light);
+    color: var(--text-main);
+    vertical-align: middle;
+}
+
+.mapping-table tr:last-child td {
+    border-bottom: none;
+}
+
+.mapping-table tr:hover {
+    background: var(--hover-bg);
+}
+
+.mapping-table input {
+    width: 100%;
+    background: var(--bg-app);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 6px 8px;
+    transition: all 0.2s;
+    font-size: 13px;
+}
+
+.mapping-table input:hover {
+    border-color: var(--text-subtle);
+}
+
+.mapping-table input:focus {
+    border-color: var(--primary);
+    background: var(--bg-panel);
+    box-shadow: 0 0 0 2px var(--primary-light);
+    outline: none;
+}
+
+.mapping-table .status-badge {
+    padding: 4px 8px;
+    border-radius: 4px;
+    font-size: 10px;
+    font-weight: 700;
+    text-transform: uppercase;
+    display: inline-block;
+    min-width: 60px;
+    text-align: center;
+}
+
+.mapping-table .status-new {
+    background: var(--bg-secondary);
+    color: var(--text-muted);
+    border: 1px solid var(--border);
+}
+
+.mapping-table .status-changed {
+    background: rgba(245, 158, 11, 0.1);
+    color: var(--warning);
+    border: 1px solid rgba(245, 158, 11, 0.2);
 }

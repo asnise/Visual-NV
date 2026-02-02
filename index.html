@@ -26,7 +26,8 @@
                             ">
                         Open Project...
                     </button>
-                    <button onclick="exportJSON()">Export Project</button>
+                    <button onclick="exportJSON()">Export Project (Basic)</button>
+                    <button onclick="openExportModal()">Advanced Export...</button>
                     <button onclick="saveJSON()">Save Project</button>
                     <input type="file" id="importInput" style="display: none" accept=".json,.vns"
                         onchange="importJSON(event)" />
@@ -565,6 +566,73 @@
         </button>
     </div>
 
+    <div id="exportConfigModal" class="modal-overlay">
+        <div class="modal-box" style="width: 500px">
+            <div class="modal-header">
+                <h3>Advanced Export Options</h3>
+                <button onclick="closeModal('exportConfigModal')">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="settings-group">
+                    <h4>Export Settings</h4>
+                    <div class="setting-row">
+                        <label>Export Assets (Zip)</label>
+                        <input type="checkbox" id="expAssets" checked onchange="saveExportSettings()" />
+                    </div>
+                    <div class="setting-row">
+                        <label>Include Asset URLs in JSON</label>
+                        <input type="checkbox" id="expUrls" checked onchange="saveExportSettings()" />
+                    </div>
+                </div>
+
+                <div class="settings-group">
+                    <h4>Organization</h4>
+                    <div class="setting-row">
+                        <div style="flex:1">
+                            <label style="margin-bottom:2px">Auto-Rename Voice Files</label>
+                            <small style="color:var(--text-muted)">Rename to Ch{ID}_Fr{Index}_{Name}</small>
+                        </div>
+                        <input type="checkbox" id="expRenameVoice" onchange="saveExportSettings()" />
+                    </div>
+                    <button class="primary-btn" onclick="openMappingModal()" style="width:100%; margin-top:10px">
+                        Manage File Mappings / Audio Names
+                    </button>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="danger" onclick="closeModal('exportConfigModal')"
+                    style="margin-right: auto">Cancel</button>
+                <button class="primary-btn" onclick="advancedExport()">Export Project</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="mappingModal" class="modal-overlay" style="z-index: 10001">
+        <div class="modal-box" style="width: 800px; max-height: 80vh; display: flex; flex-direction: column">
+            <div class="modal-header">
+                <h3>Asset Mapping Manager</h3>
+                <button onclick="closeModal('mappingModal')">&times;</button>
+            </div>
+            <div class="modal-body" style="flex:1; overflow:hidden; display:flex; flex-direction:column; padding:0;">
+                <div style="padding: 10px; border-bottom: 1px solid var(--border); display:flex; gap:10px;">
+                    <button class="primary-btn small" onclick="renderMappingTable('voice')">Voice Over</button>
+                    <button class="primary-btn small" onclick="renderMappingTable('bgm')">BGM</button>
+                    <button class="primary-btn small" onclick="renderMappingTable('backgrounds')">Backgrounds</button>
+                    <div style="flex:1"></div>
+                    <button class="primary-btn small" onclick="triggerAutoRename()"
+                        title="Rename Voice files to Standard Format">Auto Rename (Voice)</button>
+                    <button class="danger small" onclick="revertAllNames()">Revert All Renames</button>
+                </div>
+                <div id="mappingTableContainer" style="flex:1; overflow-y:auto; padding:0;">
+                    <!-- Table rendered here -->
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="primary-btn" onclick="closeMappingModal()">Back</button>
+            </div>
+        </div>
+    </div>
+    <script src="jszip.min.js"></script>
     <script src="settings.js"></script>
     <script src="pinch-zoom.override.js"></script>
     <script src="ui-overrides.js"></script>

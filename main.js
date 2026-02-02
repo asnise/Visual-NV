@@ -54,38 +54,39 @@ let editorLanguage = "EN";
 let supportedLanguages = ["EN", "TH", "JP", "CN", "KR"];
 
 let __saveTimer = null;
+
+async function saveProjectData(reason = "") {
+  try {
+    const payload = {
+      v: VN_LOCAL_PROJECT_VERSION,
+      savedAt: Date.now(),
+      reason,
+      data: {
+        project,
+        ui: {
+          activeChapterId,
+          activeFrameIndex,
+          selectedSlotIndex,
+          activeFilmstripTab,
+          stageView,
+          editorState,
+          editorLanguage,
+        },
+      },
+    };
+    // Use IndexedDB for storage
+    await ProjectStore.saveProject(payload);
+    // Optional: console.log("Saved to IndexedDB:", reason);
+  } catch (err) {
+    console.error("Save failed:", err);
+    if (typeof showToast === "function") showToast("Save Failed: " + err.message, "error");
+  }
+}
+
 function scheduleAutoSave(reason = "") {
   if (__saveTimer) clearTimeout(__saveTimer);
   __saveTimer = setTimeout(() => {
-    try {
-      const payload = {
-        v: VN_LOCAL_PROJECT_VERSION,
-        savedAt: Date.now(),
-        reason,
-        data: {
-          project,
-          ui: {
-            activeChapterId,
-            activeFrameIndex,
-            selectedSlotIndex,
-            activeFilmstripTab,
-            stageView,
-            editorState,
-            editorLanguage,
-          },
-        },
-      };
-      // Use IndexedDB for storage
-      ProjectStore.saveProject(payload)
-        .then(() => {
-          // Optional: console.log("Auto-saved to IndexedDB");
-        })
-        .catch(err => {
-          console.error("Auto-save failed:", err);
-          if (typeof showToast === "function") showToast("Auto-save Failed: " + err.message, "error");
-        });
-
-    } catch (e) { console.error(e); }
+    saveProjectData(reason);
   }, 2000); // Increase debounce to 2s
 }
 
@@ -159,6 +160,7 @@ let editingCharId = null;
 let editingOverlayIdx = -1;
 let frameClipboard = null;
 let activeFilmstripTab = "main";
+let selectedFrameIndices = new Set();
 
 let isDragging = false;
 let isResizing = false;
@@ -338,7 +340,11 @@ function newProject() {
   activeChapterId = project.chapters[0].id;
   loadChapter(activeChapterId);
   renderCastPalette();
-  scheduleAutoSave("new_project");
+
+  // IMMEDIATE SAVE: Cancel any pending auto-save and save immediately
+  if (__saveTimer) clearTimeout(__saveTimer);
+  saveProjectData("new_project");
+
   if (typeof showToast === "function")
     showToast("New project created", "success");
 }
@@ -576,11 +582,83 @@ function loadChapter(id) {
 
 function switchFrame(index) {
   activeFrameIndex = index;
+  // Ensure the active frame is in the selection set if it's a single selection or navigation
+  if (selectedFrameIndices.size <= 1 || !selectedFrameIndices.has(index)) {
+    selectedFrameIndices.clear();
+    selectedFrameIndices.add(index);
+  }
   selectedSlotIndex = -1;
   renderStage();
   renderInspector();
   renderFilmstrip();
   scheduleAutoSave("switch_frame");
+}
+
+function handleFrameClick(index, event) {
+  // If user holds CTRL, toggle selection
+  if (event.ctrlKey || event.metaKey) {
+    if (selectedFrameIndices.has(index)) {
+      selectedFrameIndices.delete(index);
+      // If we deselected the active frame, switch active to another one if possible
+      if (index === activeFrameIndex && selectedFrameIndices.size > 0) {
+        activeFrameIndex = Array.from(selectedFrameIndices)[0];
+      }
+    } else {
+      selectedFrameIndices.add(index);
+      activeFrameIndex = index; // Make the lastly added one active (optional design choice)
+    }
+  }
+  // If user holds SHIFT, range select
+  else if (event.shiftKey) {
+    const start = Math.min(activeFrameIndex, index);
+    const end = Math.max(activeFrameIndex, index);
+    selectedFrameIndices.clear();
+    for (let i = start; i <= end; i++) {
+      selectedFrameIndices.add(i);
+    }
+    activeFrameIndex = index;
+  }
+  // Normal click
+  else {
+    selectedFrameIndices.clear();
+    selectedFrameIndices.add(index);
+    activeFrameIndex = index;
+  }
+
+  // Ensure at least one frame (the active one) is selected if set became empty (e.g. ctrl-click the last one)
+  if (selectedFrameIndices.size === 0) {
+    selectedFrameIndices.add(activeFrameIndex);
+  }
+
+  selectedSlotIndex = -1;
+  renderStage();
+  renderInspector();
+  renderFilmstrip();
+  scheduleAutoSave("select_frame"); // Just to save UI state if we persists selection
+}
+
+function updateBackgroundMulti(val) {
+  const chapter = getChapter();
+  selectedFrameIndices.forEach(idx => {
+    if (chapter.frames[idx]) {
+      chapter.frames[idx].background = val;
+    }
+  });
+  renderStage();
+  renderFilmstrip(); // Thumbnail might change? No, thumb doesn't show BG.
+  renderInspector(); // To reflect change?
+  scheduleAutoSave("update_background_multi");
+}
+
+function updateBGMMulti(val) {
+  const chapter = getChapter();
+  selectedFrameIndices.forEach(idx => {
+    if (chapter.frames[idx]) {
+      chapter.frames[idx].bgm = val || null;
+    }
+  });
+  renderInspector();
+  scheduleAutoSave("update_bgm_multi");
 }
 
 function selectSlot(index) {
@@ -855,8 +933,15 @@ function renderFilmstrip() {
           dots += `<div class="thumb-dot" style="background:${c ? c.color : "#ccc"}"></div>`;
         }
       });
-      return `<div class="film-frame ${idx === activeFrameIndex ? "active" : ""}" data-idx="${idx}"
-             draggable="true" onclick="switchFrame(${idx})"
+      // Check selection state
+      const isSelected = selectedFrameIndices.has(idx);
+      const isActive = idx === activeFrameIndex;
+      const classList = ["film-frame"];
+      if (isActive) classList.push("active");
+      if (isSelected) classList.push("selected");
+
+      return `<div class="${classList.join(" ")}" data-idx="${idx}"
+             draggable="true" onclick="handleFrameClick(${idx}, event)"
              ondragstart="onFrameDragStart(event)" ondragover="onFrameDragOver(event)"
              ondrop="onFrameDrop(event)" ondragend="onFrameDragEnd(event)"
              oncontextmenu="onFrameContextMenu(event)">
@@ -1122,6 +1207,65 @@ function rgbToHex(rgb) {
 
 function renderInspector() {
   const container = document.getElementById("inspectorContent");
+
+  // --- Bulk Edit Mode ---
+  if (selectedFrameIndices.size > 1) {
+    const chapter = getChapter();
+    const frames = Array.from(selectedFrameIndices).map(i => chapter.frames[i]).filter(f => f);
+
+    // Determine common values
+    const firstBg = frames[0]?.background;
+    const sameBg = frames.every(f => f.background === firstBg);
+
+    const firstBgm = frames[0]?.bgm;
+    const sameBgm = frames.every(f => f.bgm === firstBgm);
+
+    const bgOpts = ["none", ...project.assets.backgrounds.map((b) => b.name)]
+      .map((n) => {
+        const isSelected = sameBg && n === firstBg;
+        return `<option value="${n}" ${isSelected ? "selected" : ""}>${n}</option>`;
+      })
+      .join("");
+
+    const bgmOpts = (project.assets.bgm || [])
+      .map(a => {
+        const isSelected = sameBgm && a.name === firstBgm;
+        return `<option value="${a.name}" ${isSelected ? "selected" : ""}>${a.name}</option>`;
+      })
+      .join("");
+
+    container.innerHTML = `
+      <div style="padding: 10px; border-bottom: 1px solid var(--border); margin-bottom: 15px; background: var(--bg-secondary); border-radius: 6px;">
+        <strong style="display:block; margin-bottom:4px;">${selectedFrameIndices.size} Frames Selected</strong>
+        <span style="font-size:11px; color:var(--text-muted);">Bulk editing mode</span>
+      </div>
+      
+      <div class="form-group">
+        <label>Background</label>
+        <select onchange="updateBackgroundMulti(this.value)">
+            ${!sameBg ? '<option value="" disabled selected>-- Mixed Values --</option>' : ''}
+            ${bgOpts}
+        </select>
+        <button class="primary-btn" onclick="openModal('assetsModal')" style="margin-top:5px;">Assets Manager</button>
+      </div>
+      
+      <div class="form-group">
+        <label>Background Music (BGM)</label>
+        <select onchange="updateBGMMulti(this.value)">
+             ${!sameBgm ? '<option value="" disabled selected>-- Mixed Values --</option>' : ''}
+             <option value="" ${sameBgm && !firstBgm ? "selected" : ""}> (None) </option>
+             ${bgmOpts}
+        </select>
+      </div>
+      
+      <div style="font-size: 11px; color: var(--text-muted); margin-top: 20px; padding: 10px; border: 1px dashed var(--border); border-radius: 4px;">
+        <strong>Note:</strong> Editing Speaker, Dialogue, or Character Slots is disabled in multi-select mode. Please select a single frame to edit those properties.
+      </div>
+    `;
+    return;
+  }
+
+  // --- Single Frame Mode (Original Logic) ---
   const frame = getFrame();
 
   // Styles & Icons
@@ -2193,6 +2337,9 @@ function renderAssetModal() {
                 <button class="primary-btn small" onclick="triggerAssetUpload()">
                     Upload
                 </button>
+                <button class="primary-btn small" onclick="exportAssets()">
+                    Export
+                </button>
                 <button class="primary-btn small" onclick="renameSelectedAsset()" ${!selectedAsset ? 'disabled style="opacity:0.5"' : ''}>
                     Rename
                 </button>
@@ -2407,6 +2554,108 @@ function handleAssetDrop(e) {
   });
 }
 
+
+async function exportAssets() {
+  if (typeof JSZip === 'undefined') {
+    return alert("JSZip library not loaded. Please restart the app.");
+  }
+
+  const zip = new JSZip();
+  let folderName = "";
+  let assetsToExport = [];
+
+  if (activeAssetTab === 'backgrounds') {
+    folderName = "BackGround";
+    assetsToExport = project.assets.backgrounds;
+  } else if (activeAssetTab === 'bgm') {
+    folderName = "Audio/Music";
+    assetsToExport = project.assets.bgm || [];
+  } else if (activeAssetTab === 'voice') {
+    const chapter = getChapter();
+    const chapterId = chapter ? chapter.id : "Unknown";
+    folderName = `Audio/Voice/Chapter${chapterId}`;
+
+    // Filter used assets
+    const usedVoiceNames = new Set();
+    if (chapter) {
+      chapter.frames.forEach(f => {
+        if (f.voiceOver && typeof f.voiceOver === 'object') {
+          Object.values(f.voiceOver).forEach(v => usedVoiceNames.add(v));
+        } else if (typeof f.voiceOver === 'string') {
+          usedVoiceNames.add(f.voiceOver);
+        }
+      });
+    }
+
+    const allVoice = project.assets.voice || [];
+    assetsToExport = allVoice.filter(a => usedVoiceNames.has(a.name));
+
+    if (assetsToExport.length === 0) {
+      return alert("No VoiceOver files are used in this chapter.");
+    }
+  }
+
+  if (!assetsToExport || assetsToExport.length === 0) {
+    return alert("No assets to export.");
+  }
+
+  if (typeof showLoading === 'function') showLoading("Zipping Assets...");
+
+  try {
+    const folder = zip.folder(folderName);
+
+    // Process assets
+    const promises = assetsToExport.map(async (asset) => {
+      let data = asset.url;
+      let filename = asset.fileName;
+
+      if (!filename) {
+        // Fallback if fileName missing
+        let ext = "bin";
+        if (data.startsWith("data:")) {
+          const type = data.split(';')[0].split(':')[1];
+          if (type.includes("jpeg")) ext = "jpg";
+          else if (type.includes("png")) ext = "png";
+          else if (type.includes("webp")) ext = "webp";
+          else if (type.includes("mpeg")) ext = "mp3";
+          else if (type.includes("wav")) ext = "wav";
+          else if (type.includes("ogg")) ext = "ogg";
+        }
+        filename = `${asset.name}.${ext}`;
+      }
+
+      if (data.startsWith("data:")) {
+        const content = data.split(',')[1];
+        folder.file(filename, content, { base64: true });
+      } else {
+        // Try fetch for blob urls
+        try {
+          const resp = await fetch(data);
+          const blob = await resp.blob();
+          folder.file(filename, blob);
+        } catch (e) {
+          console.error("Failed to fetch asset", asset.name, e);
+        }
+      }
+    });
+
+    await Promise.all(promises);
+
+    const content = await zip.generateAsync({ type: "blob" });
+
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(content);
+    a.download = `${activeAssetTab}_Assets.zip`;
+    a.click();
+
+  } catch (err) {
+    console.error(err);
+    alert("Failed to export assets: " + err.message);
+  } finally {
+    if (typeof hideLoading === 'function') hideLoading();
+  }
+}
+
 function triggerAssetUpload() {
   const input = document.getElementById('assetFileInput');
   if (activeAssetTab === 'backgrounds') input.accept = "image/*";
@@ -2543,6 +2792,346 @@ function removeAudio(name) {
   project.assets.audio = project.assets.audio.filter(a => a.name !== name);
   renderAssetModal();
   scheduleAutoSave("remove_audio");
+}
+
+/* --- Advanced Export Logic --- */
+
+let exportSettings = {
+  exportAssets: true,
+  includeUrls: true,
+  autoRenameVoice: false
+};
+
+function loadExportSettings() {
+  const raw = localStorage.getItem("vn_export_settings");
+  if (raw) {
+    try {
+      exportSettings = JSON.parse(raw);
+    } catch (e) { console.error("Failed to load export settings", e); }
+  }
+
+  // Apply to UI
+  document.getElementById("expAssets").checked = exportSettings.exportAssets;
+  document.getElementById("expUrls").checked = exportSettings.includeUrls;
+  document.getElementById("expRenameVoice").checked = exportSettings.autoRenameVoice;
+}
+
+function saveExportSettings() {
+  exportSettings.exportAssets = document.getElementById("expAssets").checked;
+  exportSettings.includeUrls = document.getElementById("expUrls").checked;
+  exportSettings.autoRenameVoice = document.getElementById("expRenameVoice").checked;
+
+  localStorage.setItem("vn_export_settings", JSON.stringify(exportSettings));
+}
+
+function openExportModal() {
+  loadExportSettings();
+  openModal('exportConfigModal');
+}
+
+let activeMappingType = 'voice';
+
+function openMappingModal() {
+  // Only one modal at a time, so close config first? Or stack? 
+  // Stacking is tricky with current modal logic (they use same class). 
+  // But let's assume we can just open it.
+  // Ideally we close config modal, open mapping.
+  closeModal('exportConfigModal');
+  openModal('mappingModal');
+  renderMappingTable('voice'); // Default
+}
+
+function renderMappingTable(type) {
+  activeMappingType = type;
+  const container = document.getElementById('mappingTableContainer');
+
+  // Highlight buttons
+  const buttons = document.querySelectorAll('#mappingModal .modal-body > div:first-child button.primary-btn');
+  buttons.forEach(b => {
+    if (b.textContent.toLowerCase().includes(type === 'backgrounds' ? 'background' : type))
+      b.style.opacity = "1";
+    else
+      b.style.opacity = "0.6";
+  });
+
+  let list = [];
+  if (type === 'voice') list = project.assets.voice || [];
+  else if (type === 'bgm') list = project.assets.bgm || [];
+  else if (type === 'backgrounds') list = project.assets.backgrounds || [];
+
+  if (list.length === 0) {
+    container.innerHTML = `<div style="padding:20px; text-align:center; color:var(--text-muted)">No assets found for ${type}</div>`;
+    return;
+  }
+
+  let html = `<table class="mapping-table">
+        <thead>
+            <tr>
+                <th style="width:40%">Original/Current Name</th>
+                <th style="width:40%">Export Name (Editable)</th>
+                <th style="width:20%">Status</th>
+            </tr>
+        </thead>
+        <tbody>`;
+
+  list.forEach((asset, idx) => {
+    const isRenamed = asset.originalName && asset.originalName !== asset.name;
+    html += `<tr>
+            <td>${asset.originalName || asset.name}</td>
+            <td>
+                <input class="mapping-input" type="text" value="${asset.name}" 
+                       onchange="updateAssetMapping('${type}', ${idx}, this.value)">
+            </td>
+            <td>
+                ${isRenamed
+        ? `<span class="status-badge status-changed">Renamed</span>`
+        : `<span class="status-badge status-new">Original</span>`}
+            </td>
+        </tr>`;
+  });
+
+  html += `</tbody></table>`;
+  container.innerHTML = html;
+}
+
+function updateAssetMapping(type, idx, newName) {
+  let list = [];
+  if (type === 'voice') list = project.assets.voice;
+  else if (type === 'bgm') list = project.assets.bgm;
+  else if (type === 'backgrounds') list = project.assets.backgrounds;
+
+  const asset = list[idx];
+  if (!asset.originalName) asset.originalName = asset.name; // First edit init
+
+  const oldName = asset.name;
+  asset.name = newName;
+
+  // Update References! (Simplified: naive find/replace in logic)
+  // Ref update logic is complex. We'll reuse a generic ref updater.
+  updateAssetReferences(type, oldName, newName);
+
+  renderMappingTable(type);
+  scheduleAutoSave("map_rename");
+}
+
+function updateAssetReferences(type, oldName, newName) {
+  project.chapters.forEach(ch => {
+    ch.frames.forEach(f => {
+      if (type === 'backgrounds') {
+        if (f.background === oldName) f.background = newName;
+      } else if (type === 'bgm') {
+        if (f.bgm === oldName) f.bgm = newName;
+      } else if (type === 'voice') {
+        if (typeof f.voiceOver === 'object') {
+          for (let lang in f.voiceOver) {
+            if (f.voiceOver[lang] === oldName) f.voiceOver[lang] = newName;
+          }
+        } else if (f.voiceOver === oldName) {
+          f.voiceOver = newName;
+        }
+      }
+    });
+  });
+}
+
+function revertAllNames() {
+  if (!confirm("Revert all asset names to their originals?")) return;
+
+  ['backgrounds', 'bgm', 'voice'].forEach(type => {
+    const list = (type === 'backgrounds') ? project.assets.backgrounds : project.assets[type];
+    if (!list) return;
+
+    list.forEach(asset => {
+      if (asset.originalName) {
+        const curName = asset.name;
+        const orgName = asset.originalName;
+        if (curName !== orgName) {
+          asset.name = orgName;
+          updateAssetReferences(type, curName, orgName);
+          delete asset.originalName;
+        }
+      }
+    });
+  });
+
+  renderMappingTable(activeMappingType);
+  scheduleAutoSave("revert_all_names");
+  if (typeof showToast === 'function') showToast("All names reverted", "success");
+}
+
+async function advancedExport() {
+  closeModal('exportConfigModal');
+  if (!window.JSZip) return alert("JSZip not loaded");
+
+  if (exportSettings.autoRenameVoice) {
+    performAutoRenameVoice();
+  }
+
+  if (typeof showLoading === 'function') showLoading("Building Project Package...");
+
+  try {
+    const zip = new JSZip();
+
+    // 1. Prepare Data
+    const data = deepClone(project);
+
+    // 2. Process Assets for Zip and Data Cleaning
+    if (exportSettings.exportAssets) {
+      // Backgrounds
+      const bgFolder = zip.folder("BackGround");
+      for (const bg of data.assets.backgrounds) {
+        if (bg.url && bg.url.startsWith("data:")) {
+          const ext = getExt(bg.url) || "png";
+          bgFolder.file(`${bg.name}.${ext}`, bg.url.split(',')[1], { base64: true });
+          // Strip URL from JSON if configured
+          if (!exportSettings.includeUrls) bg.url = `BackGround/${bg.name}.${ext}`;
+        }
+      }
+
+      // BGM
+      if (data.assets.bgm) {
+        const musicFolder = zip.folder("Audio/Music");
+        for (const m of data.assets.bgm) {
+          if (m.url && m.url.startsWith("data:")) {
+            const ext = getExt(m.url) || "mp3";
+            musicFolder.file(`${m.name}.${ext}`, m.url.split(',')[1], { base64: true });
+            if (!exportSettings.includeUrls) m.url = `Audio/Music/${m.name}.${ext}`;
+          }
+        }
+      }
+
+      // Voice
+      if (data.assets.voice) {
+        // Voice needs to go into chapter folders? Or just Audio/Voice flat?
+        // Request said: "VoiceOver also 'Audio/Voice/Chapter{ID}/'" when exporting specific assets.
+        // For FULL PROJECT export, structurally it's better to organize by chapter IF possible, 
+        // but assets list is global. 
+        // Let's assume a flat Audio/Voice for project export unless we want to duplicate.
+        // Actually user request "Auto rename to match standard". 
+        // Let's use Audio/Voice root for project package to avoid complexity of detecting usage again,
+        // OR we can organize if we renamed them to include Chapter ID.
+
+        const voiceFolder = zip.folder("Audio/Voice");
+        for (const v of data.assets.voice) {
+          if (v.url && v.url.startsWith("data:")) {
+            const ext = getExt(v.url) || "mp3";
+            voiceFolder.file(`${v.name}.${ext}`, v.url.split(',')[1], { base64: true });
+            if (!exportSettings.includeUrls) v.url = `Audio/Voice/${v.name}.${ext}`;
+          }
+        }
+      }
+
+      // Characters (Bodies & Faces)
+      if (data.characters) {
+        const charFolder = zip.folder("Characters");
+        for (const char of data.characters) {
+          const safeName = char.name.replace(/[^a-zA-Z0-9-_]/g, '_');
+          const cFolder = charFolder.folder(safeName);
+
+          // Bodies
+          if (char.bodies) {
+            for (const b of char.bodies) {
+              if (b.url && b.url.startsWith("data:")) {
+                const ext = getExt(b.url) || "png";
+                cFolder.file(`${b.name}.${ext}`, b.url.split(',')[1], { base64: true });
+                if (!exportSettings.includeUrls) b.url = `Characters/${safeName}/${b.name}.${ext}`;
+              }
+            }
+          }
+
+          // Faces
+          if (char.faces) {
+            for (const f of char.faces) {
+              if (f.url && f.url.startsWith("data:")) {
+                const ext = getExt(f.url) || "png";
+                cFolder.file(`${f.name}.${ext}`, f.url.split(',')[1], { base64: true });
+                if (!exportSettings.includeUrls) f.url = `Characters/${safeName}/${f.name}.${ext}`;
+              }
+            }
+          }
+        }
+      }
+    }
+
+    // 3. Add Project JSON
+    zip.file("project.json", JSON.stringify(data, null, 2));
+
+    // 4. Download
+    const content = await zip.generateAsync({ type: "blob" });
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(content);
+    a.download = `Project_Export_${Date.now()}.zip`;
+    a.click();
+
+  } catch (e) {
+    console.error(e);
+    alert("Export failed: " + e.message);
+  } finally {
+    if (typeof hideLoading === 'function') hideLoading();
+  }
+}
+
+function closeMappingModal() {
+  closeModal('mappingModal');
+  openModal('exportConfigModal');
+}
+
+function triggerAutoRename() {
+  performAutoRenameVoice();
+  renderMappingTable(activeMappingType);
+}
+
+function performAutoRenameVoice() {
+  // Iterate all chapters, rename used voice files to ChX_FrY_Name
+  const usedAssets = new Map(); // Name -> { firstUsage: "ChX_FrY", original: "..." }
+
+  project.chapters.forEach(ch => {
+    ch.frames.forEach((iframe, fIdx) => {
+      const processVoice = (vName) => {
+        if (!vName || usedAssets.has(vName)) return;
+        usedAssets.set(vName, `Ch${ch.id}_Fr${fIdx + 1}`);
+      };
+
+      if (typeof iframe.voiceOver === 'object') {
+        Object.values(iframe.voiceOver).forEach(processVoice);
+      } else if (typeof iframe.voiceOver === 'string') {
+        processVoice(iframe.voiceOver);
+      }
+    });
+  });
+
+  if (!project.assets.voice) return;
+
+  let count = 0;
+  project.assets.voice.forEach((v, idx) => {
+    const prefix = usedAssets.get(v.name);
+    if (prefix) {
+      // It is used, rename it
+      if (!v.originalName) v.originalName = v.name;
+      const cleanName = v.originalName.replace(/\s+/g, '_');
+      const newName = `${prefix}_${cleanName}`;
+
+      // Apply rename
+      updateAssetReferences('voice', v.name, newName);
+      v.name = newName;
+      count++;
+    }
+  });
+
+  if (count > 0 && typeof showToast === 'function')
+    showToast(`Auto-renamed ${count} voice files`, 'success');
+}
+
+function getExt(dataUrl) {
+  if (!dataUrl) return "";
+  const type = dataUrl.split(';')[0].split(':')[1];
+  if (type.includes("jpeg")) return "jpg";
+  if (type.includes("png")) return "png";
+  if (type.includes("webp")) return "webp";
+  if (type.includes("mpeg")) return "mp3";
+  if (type.includes("wav")) return "wav";
+  if (type.includes("ogg")) return "ogg";
+  return "bin";
 }
 
 function renameBackground(oldName) {
