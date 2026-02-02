@@ -1421,16 +1421,22 @@ function renderInspector() {
             <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
                <label style="font-size:11px; margin:0;">Voice Over (${editorLanguage})</label>
             </div>
-            <div style="display:flex; gap:5px; align-items:center;">
-                <select onchange="updateVoiceOver(this.value)" style="flex:1; font-size:11px;">
-                    <option value="">(None)</option>
-                    ${(project.assets.voice || []).map(a => {
+            <div style="display:flex; flex-direction:column; gap:5px;">
+                <input type="text" placeholder="Search Voice..." class="inspector-input" 
+                       style="padding:4px; font-size:11px;" 
+                       oninput="filterVoiceDropdown(this.value)">
+                
+                <div style="display:flex; gap:5px; align-items:center;">
+                    <select id="voiceOverSelect" onchange="updateVoiceOver(this.value)" style="flex:1; font-size:11px;">
+                        <option value="">(None)</option>
+                        ${(project.assets.voice || []).map(a => {
           const voMap = (typeof frame.voiceOver === 'object' && frame.voiceOver) ? frame.voiceOver : (typeof frame.voiceOver === 'string' ? { [editorLanguage]: frame.voiceOver } : {});
           const currentVo = voMap[editorLanguage];
           const selected = currentVo === a.name ? "selected" : "";
           return `<option value="${a.name}" ${selected}>${a.name}</option>`;
         }).join("")}
-                </select>
+                    </select>
+                </div>
             </div>
             <input type="file" id="voFileInput" style="display:none;" accept="audio/*" onchange="handleVoUpload(this)">
         </div>
@@ -1518,6 +1524,30 @@ function updateVoiceOver(val) {
   }
 
   scheduleAutoSave("update_voice_over");
+}
+
+function filterVoiceDropdown(query) {
+  const select = document.getElementById("voiceOverSelect");
+  if (!select) return;
+
+  const term = query.toLowerCase();
+  const frame = getFrame();
+
+  // Helper to check if option should be selected
+  const isSelected = (val) => {
+    const voMap = (typeof frame.voiceOver === 'object' && frame.voiceOver) ? frame.voiceOver : (typeof frame.voiceOver === 'string' ? { [editorLanguage]: frame.voiceOver } : {});
+    return voMap[editorLanguage] === val;
+  };
+
+  const optionsHTML = `<option value="">(None)</option>` +
+    (project.assets.voice || [])
+      .filter(a => a.name.toLowerCase().includes(term) || isSelected(a.name)) // Keep selected even if not match
+      .map(a => {
+        const selected = isSelected(a.name) ? "selected" : "";
+        return `<option value="${a.name}" ${selected}>${a.name}</option>`;
+      }).join("");
+
+  select.innerHTML = optionsHTML;
 }
 
 function triggerVoUpload() {
@@ -2289,6 +2319,7 @@ function uploadLayerImage(type, idx, input) {
 
 // --- Assets Manager (File Explorer Style) ---
 let activeAssetTab = "backgrounds"; // repurpose as 'current category'
+let activeAssetSort = 'newest';
 let selectedAsset = null; // Currently selected asset name
 
 function renderAssetModal() {
@@ -2333,7 +2364,14 @@ function renderAssetModal() {
                  <span style="font-weight:400; color:var(--text-muted); margin-left:5px; font-size:12px;">(${getAssetCount(activeAssetTab)} items)</span>
             </div>
             
-            <div style="display: flex; gap: 8px;">
+            <div style="display: flex; gap: 8px; align-items: center;">
+                <select style="padding:4px; font-size:12px; border:1px solid var(--border); border-radius:4px;" onchange="changeAssetSort(this.value)">
+                    <option value="newest" ${activeAssetSort === 'newest' ? 'selected' : ''}>Newest</option>
+                    <option value="oldest" ${activeAssetSort === 'oldest' ? 'selected' : ''}>Oldest</option>
+                    <option value="az" ${activeAssetSort === 'az' ? 'selected' : ''}>Name (A-Z)</option>
+                    <option value="za" ${activeAssetSort === 'za' ? 'selected' : ''}>Name (Z-A)</option>
+                </select>
+                <div style="width:1px; height:20px; background:var(--border); margin:0 5px;"></div>
                 <button class="primary-btn small" onclick="triggerAssetUpload()">
                     Upload
                 </button>
@@ -2443,17 +2481,40 @@ function switchAssetExplorer(tab) {
   renderAssetModal();
 }
 
+function changeAssetSort(val) {
+  activeAssetSort = val;
+  renderAssetModal();
+}
+
 function renderExplorerItems() {
   let items = [];
   if (activeAssetTab === 'backgrounds') items = project.assets.backgrounds;
   else if (activeAssetTab === 'bgm') items = project.assets.bgm || [];
   else if (activeAssetTab === 'voice') items = project.assets.voice || [];
 
-  if (items.length === 0) {
+  // Clone to avoid mutating original order permanently (optional, or we just Sort display)
+  // Actually, keeping original order might be important if index matters? 
+  // Indices matter if we referenced by index, but we reference by Name.
+  // So sorting display is safe.
+  let sortedItems = [...items];
+
+  if (activeAssetSort === 'newest') {
+    // Assuming array order IS "oldest to newest" by default push? 
+    // Actually push adds to end, so higher index = newer.
+    sortedItems.reverse();
+  } else if (activeAssetSort === 'oldest') {
+    // Default order
+  } else if (activeAssetSort === 'az') {
+    sortedItems.sort((a, b) => a.name.localeCompare(b.name));
+  } else if (activeAssetSort === 'za') {
+    sortedItems.sort((a, b) => b.name.localeCompare(a.name));
+  }
+
+  if (sortedItems.length === 0) {
     return `<div style="grid-column: 1 / -1; text-align: center; color: var(--text-muted); padding-top: 50px; font-style: italic;">No items found. Upload one!</div>`;
   }
 
-  return items.map(item => {
+  return sortedItems.map(item => {
     const isSelected = selectedAsset === item.name;
     // Thumbnail logic
     let thumbContent = '';
@@ -2830,6 +2891,17 @@ function openExportModal() {
 }
 
 let activeMappingType = 'voice';
+let activeMappingSort = { col: 'original', dir: 1 }; // 1 = asc, -1 = desc
+
+function toggleMappingSort(col) {
+  if (activeMappingSort.col === col) {
+    activeMappingSort.dir *= -1;
+  } else {
+    activeMappingSort.col = col;
+    activeMappingSort.dir = 1;
+  }
+  renderMappingTable(activeMappingType);
+}
 
 function openMappingModal() {
   // Only one modal at a time, so close config first? Or stack? 
@@ -2859,28 +2931,43 @@ function renderMappingTable(type) {
   else if (type === 'bgm') list = project.assets.bgm || [];
   else if (type === 'backgrounds') list = project.assets.backgrounds || [];
 
-  if (list.length === 0) {
+  // Sort Logic
+  const sortedList = [...list].sort((a, b) => {
+    const valA = (a.originalName || a.name).toLowerCase();
+    const valB = (b.originalName || b.name).toLowerCase();
+    if (valA < valB) return -1 * activeMappingSort.dir;
+    if (valA > valB) return 1 * activeMappingSort.dir;
+    return 0;
+  });
+
+  if (sortedList.length === 0) {
     container.innerHTML = `<div style="padding:20px; text-align:center; color:var(--text-muted)">No assets found for ${type}</div>`;
     return;
   }
 
+  const sortIcon = activeMappingSort.dir === 1 ? '↑' : '↓';
+  const sortHeader = activeMappingSort.col === 'original' ? `Original/Current Name ${sortIcon}` : 'Original/Current Name';
+
   let html = `<table class="mapping-table">
         <thead>
             <tr>
-                <th style="width:40%">Original/Current Name</th>
+                <th style="width:40%; cursor:pointer; user-select:none;" onclick="toggleMappingSort('original')">${sortHeader}</th>
                 <th style="width:40%">Export Name (Editable)</th>
                 <th style="width:20%">Status</th>
             </tr>
         </thead>
         <tbody>`;
 
-  list.forEach((asset, idx) => {
+  sortedList.forEach((asset, idx) => {
+    // We need original index to update the REAL source array?
+    const realIdx = list.indexOf(asset);
+
     const isRenamed = asset.originalName && asset.originalName !== asset.name;
     html += `<tr>
             <td>${asset.originalName || asset.name}</td>
             <td>
                 <input class="mapping-input" type="text" value="${asset.name}" 
-                       onchange="updateAssetMapping('${type}', ${idx}, this.value)">
+                       onchange="updateAssetMapping('${type}', ${realIdx}, this.value)">
             </td>
             <td>
                 ${isRenamed

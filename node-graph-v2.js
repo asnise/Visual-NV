@@ -1293,6 +1293,12 @@
         const MAX = 25;
         titleText =
           rawText.length > MAX ? rawText.slice(0, MAX) + "..." : rawText;
+
+        const allFrames = getFrames();
+        const fIdx = allFrames.findIndex(f => f && f.id === frame.id);
+        if (fIdx !== -1) {
+          titleText = `#${fIdx + 1} ${titleText}`;
+        }
       }
 
       b.textContent = titleText || "";
