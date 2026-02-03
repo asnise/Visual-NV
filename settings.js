@@ -32,7 +32,7 @@ function openSettingsModal() {
   }
 
   document.getElementById("settingTheme").value = appSettings.theme;
-  document.getElementById("settingUIScale").value = appSettings.uiScale;
+  // document.getElementById("settingUIScale").value = appSettings.uiScale; // Removed
   document.getElementById("settingStageBackground").value =
     appSettings.stageBackground;
   document.getElementById("settingHWAccel").checked = appSettings.hwAccel;
@@ -75,9 +75,9 @@ function cancelSettings() {
 
 function saveAndApplySettings() {
   appSettings.theme = document.getElementById("settingTheme").value;
-  appSettings.uiScale = parseFloat(
-    document.getElementById("settingUIScale").value,
-  );
+  appSettings.theme = document.getElementById("settingTheme").value;
+  // appSettings.uiScale = 1; // Enforce default
+
   appSettings.stageBackground = document.getElementById(
     "settingStageBackground",
   ).value;
@@ -182,7 +182,7 @@ function resetSettings() {
     };
     try {
       localStorage.removeItem("vnEditorSettings");
-    } catch (e) {}
+    } catch (e) { }
 
     openSettingsModal();
     applyEffects();
