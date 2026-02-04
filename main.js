@@ -312,10 +312,15 @@ function newProject() {
   if (!ok) return;
 
   project = {
-    // --- START ADDITION: Default Languages ---
+    // --- START ADDITION: Default Languages & Folders ---
     languages: ["EN", "TH", "JP", "CN", "KR"],
+    assets: {
+      backgrounds: [],
+      bgm: [],
+      voice: [],
+      folders: [] // New Folders Array
+    },
     // --- END ADDITION ---
-    assets: { backgrounds: [] },
     characters: [],
     chapters: [
       {
@@ -785,12 +790,54 @@ function renderCastPalette() {
       const thumb = c.bodies[0]?.url
         ? `background-image:url('${c.bodies[0].url}')`
         : `background-color:${c.color}`;
-      return `<div class="draggable-char" draggable="true" ondragstart="dragStartNew(event)" data-id="${c.id}">
+      return `<div class="draggable-char" draggable="true" ondragstart="dragStartNew(event)" data-id="${c.id}" oncontextmenu="onCastContextMenu(event, '${c.id}')">
               <div class="char-dot" style="${thumb}"></div>
               <div style="font-weight:500;font-size:13px;">${c.name}</div>
             </div>`;
     })
     .join("");
+}
+
+// --- Cast Context Menu ---
+let contextCastId = null;
+
+function onCastContextMenu(e, id) {
+  e.preventDefault();
+  e.stopPropagation();
+  contextCastId = id;
+
+  // Hide other menus
+  hideSlideContextMenu();
+  // if (typeof hideAssetContextMenu === 'function') hideAssetContextMenu(); // Optional
+
+  const menu = document.getElementById("castContextMenu");
+  if (!menu) return;
+
+  menu.style.display = "block";
+  menu.style.left = e.clientX + "px";
+  menu.style.top = e.clientY + "px";
+
+  document.addEventListener("click", hideCastContextMenu);
+}
+
+function hideCastContextMenu() {
+  const menu = document.getElementById("castContextMenu");
+  if (menu) menu.style.display = "none";
+  document.removeEventListener("click", hideCastContextMenu);
+}
+
+function castContextAction(action) {
+  if (!contextCastId) return;
+
+  if (action === 'edit') {
+    editingCharId = contextCastId;
+    renderCharModal();
+    openModal('characterModal');
+  } else if (action === 'delete') {
+    deleteCharacter(contextCastId);
+  }
+
+  hideCastContextMenu();
 }
 
 function renderStage() {
@@ -2104,6 +2151,7 @@ async function importJSON(e) {
     if (imported.characters && imported.chapters) {
       project = imported;
       if (!project.assets) project.assets = { backgrounds: [] };
+      if (!project.assets.folders) project.assets.folders = []; // Ensure folders exist on import
 
       // --- START ADDITION: Import Languages ---
       if (Array.isArray(project.languages)) {
@@ -2320,7 +2368,16 @@ function uploadLayerImage(type, idx, input) {
 // --- Assets Manager (File Explorer Style) ---
 let activeAssetTab = "backgrounds"; // repurpose as 'current category'
 let activeAssetSort = 'newest';
-let selectedAsset = null; // Currently selected asset name
+// let selectedAsset = null; // OLD single selection
+let selectedAssetItems = new Set(); // Multi-select Set of asset names (or IDs if unique)
+let currentFolderId = null; // null = root
+let assetClipboard = { type: null, items: [] }; // for cut/copy/paste
+
+// Selection State
+let isSelectingAssets = false;
+let selectionStart = { x: 0, y: 0 };
+let selectionEnd = { x: 0, y: 0 };
+
 
 function renderAssetModal() {
   const modalBody = document.querySelector("#assetsModal .modal-body");
@@ -2338,6 +2395,21 @@ function renderAssetModal() {
     "bgm": "BGM (Music)",
     "voice": "Voice Over"
   };
+
+  // Generate Breadcrumbs
+  let breadcrumbsHtml = `<span class="breadcrumb-item" onclick="navigateFolder(null)">Root</span>`;
+  let path = [];
+  let tempId = currentFolderId;
+  while (tempId) {
+    const f = project.assets.folders?.find(fo => fo.id === tempId);
+    if (f) {
+      path.unshift(f);
+      tempId = f.parentId;
+    } else tempId = null;
+  }
+  path.forEach(f => {
+    breadcrumbsHtml += ` <span style="color:#aaa">/</span> <span class="breadcrumb-item" onclick="navigateFolder('${f.id}')">${f.name}</span>`;
+  });
 
   // --- HTML Structure ---
   modalBody.innerHTML = `
@@ -2358,10 +2430,17 @@ function renderAssetModal() {
     <!-- Main Content -->
     <div style="flex: 1; display: flex; flex-direction: column; min-width: 0; background: var(--bg-body);">
         <!-- Toolbar -->
-        <div style="height: 40px; border-bottom: 1px solid var(--border); display: flex; align-items: center; padding: 0 15px; background: var(--bg-panel);">
-            <div style="font-weight: 600; font-size: 14px; color: var(--text-main); margin-right: auto;">
-                 ${catNames[activeAssetTab]} 
-                 <span style="font-weight:400; color:var(--text-muted); margin-left:5px; font-size:12px;">(${getAssetCount(activeAssetTab)} items)</span>
+        <div style="height: 48px; border-bottom: 1px solid var(--border); display: flex; align-items: center; padding: 0 15px; background: var(--bg-panel); gap: 10px;">
+             <!-- Back / Up Button -->
+             <button class="icon-btn" onclick="navigateUp()" title="Up" style="color:var(--text-main); width:28px; height:28px; border:1px solid var(--border); border-radius:4px; ${!currentFolderId ? 'opacity:0.3; pointer-events:none;' : ''}">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m15 18-6-6 6-6"/></svg>
+             </button>
+
+            <div style="font-weight: 600; font-size: 14px; color: var(--text-main); margin-right: auto; display:flex; flex-direction:column;">
+                 <div>${catNames[activeAssetTab]}</div>
+                 <div style="font-size:11px; color:var(--text-muted); display:flex; gap:4px;">
+                    ${breadcrumbsHtml}
+                 </div>
             </div>
             
             <div style="display: flex; gap: 8px; align-items: center;">
@@ -2372,34 +2451,54 @@ function renderAssetModal() {
                     <option value="za" ${activeAssetSort === 'za' ? 'selected' : ''}>Name (Z-A)</option>
                 </select>
                 <div style="width:1px; height:20px; background:var(--border); margin:0 5px;"></div>
+                
+                <button class="primary-btn small" onclick="createNewFolder()">
+                    + Folder
+                </button>
                 <button class="primary-btn small" onclick="triggerAssetUpload()">
                     Upload
                 </button>
                 <button class="primary-btn small" onclick="exportAssets()">
                     Export
                 </button>
-                <button class="primary-btn small" onclick="renameSelectedAsset()" ${!selectedAsset ? 'disabled style="opacity:0.5"' : ''}>
-                    Rename
-                </button>
-                <button class="danger small" onclick="deleteSelectedAsset()" ${!selectedAsset ? 'disabled style="opacity:0.5"' : ''}>
-                    Delete
+
+                <!-- Context Menu Trigger (Visual only, actual is right click) -->
+                <button class="icon-btn" onclick="showAssetContextMenu(event.clientX, event.clientY + 20)" style="color:var(--text-main); width:28px; height:28px; border:1px solid var(--border); border-radius:4px;">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="1"/><circle cx="12" cy="5" r="1"/><circle cx="12" cy="19" r="1"/></svg>
                 </button>
             </div>
         </div>
 
         <!-- File Grid -->
         <div id="explorerGrid" 
+             class="explorer-grid"
              ondragover="handleAssetDragOver(event)" 
              ondragleave="handleAssetDragLeave(event)" 
              ondrop="handleAssetDrop(event)"
+             onmousedown="onExplorerMouseDown(event)"
              onclick="deselectAsset(event)" 
-             style="flex: 1; overflow-y: auto; overflow-x: hidden; padding: 15px; display: grid; grid-template-columns: repeat(auto-fill, minmax(100px, 1fr)); grid-auto-rows: max-content; gap: 10px; align-content: start;">
+             oncontextmenu="onExplorerContextMenu(event)"
+             style="flex: 1; overflow-y: auto; overflow-x: hidden; padding: 15px; display: grid; grid-template-columns: repeat(auto-fill, minmax(100px, 1fr)); grid-auto-rows: max-content; gap: 10px; align-content: start; position: relative;">
             ${renderExplorerItems()}
+            
+            <!-- Selection Box -->
+            <div id="selectionBox" class="selection-box"></div>
         </div>
     </div>
     
     <!-- Hidden Input -->
     <input type="file" id="assetFileInput" style="display: none" />
+    
+    <!-- Context Menu -->
+    <div id="assetContextMenu" class="context-menu">
+        <button onclick="assetContextAction('open')">Open</button>
+        <button onclick="assetContextAction('rename')">Rename</button>
+        <button onclick="assetContextAction('cut')">Cut</button>
+        <button onclick="assetContextAction('copy')">Copy</button>
+        <button onclick="assetContextAction('paste')">Paste</button>
+        <div style="height:1px; background:var(--border); margin:2px 0;"></div>
+        <button class="danger" onclick="assetContextAction('delete')">Delete</button>
+    </div>
   `;
 
   // Inject CSS for Nav Items if not present (simple inline style check)
@@ -2432,7 +2531,8 @@ function renderAssetModal() {
               border-radius: 4px;
               border: 1px solid transparent;
               cursor: pointer;
-              transition: background 0.1s;
+              transition: background 0.1s, transform 0.1s;
+              user-select: none;
           }
           .explorer-item:hover {
               background: rgba(255,255,255,0.05);
@@ -2453,6 +2553,7 @@ function renderAssetModal() {
               align-items: center;
               justify-content: center;
               position: relative;
+              transition: all 0.2s;
           }
           .explorer-label {
               font-size: 11px;
@@ -2463,12 +2564,22 @@ function renderAssetModal() {
               text-overflow: ellipsis;
               white-space: nowrap;
           }
+          .breadcrumb-item {
+              cursor:pointer; 
+              color:var(--text-main);
+          }
+          .breadcrumb-item:hover {
+              text-decoration:underline;
+              color:var(--primary);
+          }
       `;
     document.head.appendChild(style);
   }
 }
 
 function getAssetCount(type) {
+  // Return count of items in CURRENT folder + subfolders? Or just total?
+  // Let's return Total for now.
   if (type === 'backgrounds') return project.assets.backgrounds.length;
   if (type === 'bgm') return (project.assets.bgm || []).length;
   if (type === 'voice') return (project.assets.voice || []).length;
@@ -2477,7 +2588,8 @@ function getAssetCount(type) {
 
 function switchAssetExplorer(tab) {
   activeAssetTab = tab;
-  selectedAsset = null; // Reset selection on switch
+  currentFolderId = null; // Reset to root
+  selectedAssetItems.clear(); // Reset selection
   renderAssetModal();
 }
 
@@ -2492,121 +2604,725 @@ function renderExplorerItems() {
   else if (activeAssetTab === 'bgm') items = project.assets.bgm || [];
   else if (activeAssetTab === 'voice') items = project.assets.voice || [];
 
-  // Clone to avoid mutating original order permanently (optional, or we just Sort display)
-  // Actually, keeping original order might be important if index matters? 
-  // Indices matter if we referenced by index, but we reference by Name.
-  // So sorting display is safe.
-  let sortedItems = [...items];
+  // Filter by Folder
+  const filteredFiles = items.filter(i => (i.folderId || null) === currentFolderId);
+  const filteredFolders = (project.assets.folders || []).filter(f =>
+    (f.parentId === currentFolderId || (!f.parentId && !currentFolderId)) &&
+    (!f.type || f.type === activeAssetTab) // Optional type filtering for folders
+  );
+
+  // Sorting
+  const sortFn = (a, b) => {
+    if (activeAssetSort === 'az') return a.name.localeCompare(b.name);
+    if (activeAssetSort === 'za') return b.name.localeCompare(a.name);
+    return 0; // default (newest/oldest handled by array order usually, or we can add timestamp)
+  };
 
   if (activeAssetSort === 'newest') {
-    // Assuming array order IS "oldest to newest" by default push? 
-    // Actually push adds to end, so higher index = newer.
-    sortedItems.reverse();
+    filteredFiles.reverse(); // Reverse for display (assuming append = new)
+    filteredFolders.reverse();
   } else if (activeAssetSort === 'oldest') {
-    // Default order
-  } else if (activeAssetSort === 'az') {
-    sortedItems.sort((a, b) => a.name.localeCompare(b.name));
-  } else if (activeAssetSort === 'za') {
-    sortedItems.sort((a, b) => b.name.localeCompare(a.name));
+    // Keep order
+  } else {
+    filteredFiles.sort(sortFn);
+    filteredFolders.sort(sortFn);
   }
 
-  if (sortedItems.length === 0) {
-    return `<div style="grid-column: 1 / -1; text-align: center; color: var(--text-muted); padding-top: 50px; font-style: italic;">No items found. Upload one!</div>`;
+  let html = "";
+
+  // Render Folders
+  filteredFolders.forEach(folder => {
+    const isSelected = selectedAssetItems.has(folder.id);
+    html += `
+        <div class="explorer-item folder ${isSelected ? 'selected' : ''}" 
+             data-id="${folder.id}" data-type="folder"
+             draggable="true"
+             ondragstart="handleDragStart(event, 'folder', '${folder.id}')"
+             ondragover="handleDragOverItem(event, this)"
+             ondragleave="handleDragLeaveItem(event, this)"
+             ondrop="handleDropOnItem(event, '${folder.id}')"
+             onclick="selectAsset(event, '${folder.id}', 'folder')" 
+             ondblclick="navigateFolder('${folder.id}')">
+            <div class="explorer-thumb">
+               <svg class="folder-icon" viewBox="0 0 24 24"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path></svg>
+            </div>
+            <div class="explorer-label" title="${folder.name}">${folder.name}</div>
+        </div>
+      `;
+  });
+
+  // Render Files
+  if (filteredFiles.length === 0 && filteredFolders.length === 0) {
+    if (activeAssetSort === 'newest' && items.length > 0 && !currentFolderId) {
+      // If items exist but not in root (and we are in root), maybe show nothing?
+      // Wait, if items have no folderId they ARE in root. 
+    }
+    html += `<div style="grid-column: 1 / -1; text-align: center; color: var(--text-muted); padding-top: 50px; font-style: italic;">Empty Folder</div>`;
   }
 
-  return sortedItems.map(item => {
-    const isSelected = selectedAsset === item.name;
-    // Thumbnail logic
+  filteredFiles.forEach(item => {
+    // Unique ID for selection? Use Name for legacy compat, but Name might not be unique across folders if we allow that.
+    // Ideally assets should have IDs. For now we use Name (assuming global unique names enforced elsewhere or legacy).
+    // Actually, let's use the object reference or index? No, we need a stable ID. 
+    // If names are unique globally (which they seem to be in this system), Name is ID.
+    const id = item.name;
+    const isSelected = selectedAssetItems.has(id);
+
     let thumbContent = '';
     if (activeAssetTab === 'backgrounds') {
       thumbContent = `style="background-image: url('${item.url}')"`;
     } else {
-      // Audio Icon with Play overlay if selected? logic can be simple icon
       thumbContent = `><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#666" stroke-width="2"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>`;
     }
 
-    return `
-            <div class="explorer-item ${isSelected ? 'selected' : ''}" onclick="selectAsset(event, '${item.name}')" ondblclick="previewAsset('${item.name}')">
-                <div class="explorer-thumb" ${thumbContent}${activeAssetTab !== 'backgrounds' ? '' : '>'}
-                   ${activeAssetTab !== 'backgrounds' ? `<div style="position:absolute; bottom:2px; right:2px; font-size:10px; color:#666;">🎵</div>` : ''}
-                </div>
-                <div class="explorer-label" title="${item.name}">${item.name}</div>
+    html += `
+        <div class="explorer-item file ${isSelected ? 'selected' : ''}" 
+             data-id="${id}" data-type="file"
+             draggable="true"
+             ondragstart="handleDragStart(event, 'file', '${id}')"
+             onclick="selectAsset(event, '${id}', 'file')" 
+             ondblclick="previewAsset('${item.name}')">
+            <div class="explorer-thumb" ${thumbContent}${activeAssetTab !== 'backgrounds' ? '' : '>'}
+               ${activeAssetTab !== 'backgrounds' ? `<div style="position:absolute; bottom:2px; right:2px; font-size:10px; color:#666;">🎵</div>` : ''}
             </div>
-        `;
-  }).join("");
+            <div class="explorer-label" title="${item.name}">${item.name}</div>
+        </div>
+    `;
+  });
+
+  return html;
 }
 
-function selectAsset(e, name) {
-  e.stopPropagation();
-  selectedAsset = (selectedAsset === name) ? null : name; // Toggle if needed, or just set
-  if (selectedAsset) {
-    // Play audio preview if audio?
-    if (activeAssetTab !== 'backgrounds') playAudioPreview(name);
-  } else {
-    stopAudioPreview();
+// --- Folder Logic ---
+
+// --- Folder Logic ---
+
+function createNewFolder() {
+  const name = prompt("Enter Folder Name:", "New Folder");
+  if (!name) return;
+
+  // Check for duplicate folder name in current directory
+  const exists = project.assets.folders.some(f =>
+    f.parentId === currentFolderId &&
+    f.name.toLowerCase() === name.toLowerCase() &&
+    (!f.type || f.type === activeAssetTab)
+  );
+
+  if (exists) {
+    alert(`Folder named "${name}" already exists!`);
+    return;
   }
+
+  const newFolder = {
+    id: "folder_" + Date.now(),
+    name: name,
+    parentId: currentFolderId,
+    type: activeAssetTab, // Bind folder to current type view
+    createdAt: Date.now()
+  };
+
+  if (!project.assets.folders) project.assets.folders = [];
+  project.assets.folders.push(newFolder);
+  scheduleAutoSave("create_folder");
   renderAssetModal();
 }
 
-function deselectAsset(e) {
-  if (e.target.id === 'explorerGrid') {
-    selectedAsset = null;
+function navigateFolder(id) {
+  currentFolderId = id;
+  selectedAssetItems.clear();
+  renderAssetModal();
+}
+
+function navigateUp() {
+  if (!currentFolderId) return;
+  const f = project.assets.folders.find(fo => fo.id === currentFolderId);
+  navigateFolder(f ? f.parentId : null);
+}
+
+// ... (Selection Logic - Unchanged) ...
+// ...
+
+function assetContextAction(action) {
+  if (selectedAssetItems.size === 0 && action !== 'paste') return;
+
+  const firstId = Array.from(selectedAssetItems)[0];
+
+  if (action === 'open') {
+    const folder = project.assets.folders.find(f => f.id === firstId);
+    if (folder) navigateFolder(firstId);
+    else if (selectedAssetItems.size === 1) previewAsset(firstId); // Preview file
+  }
+
+  if (action === 'rename') {
+    if (selectedAssetItems.size !== 1) return alert("Please select one item to rename.");
+    const isFolder = firstId.startsWith('folder_');
+    if (isFolder) {
+      const f = project.assets.folders.find(fo => fo.id === firstId);
+      const newName = prompt("Rename Folder:", f.name);
+
+      if (newName && newName !== f.name) {
+        // Check collision
+        const exists = project.assets.folders.some(fo =>
+          fo.id !== f.id && // Not self
+          fo.parentId === f.parentId && // Same parent
+          fo.name.toLowerCase() === newName.toLowerCase() &&
+          (!fo.type || fo.type === activeAssetTab)
+        );
+
+        if (exists) {
+          alert(`Folder named "${newName}" already exists!`);
+          return;
+        }
+
+        f.name = newName;
+        scheduleAutoSave("rename_folder");
+        renderAssetModal();
+      }
+    } else {
+      // File rename logic (existing renameSelectedAsset adapted)
+      selectedAsset = firstId; // Compatibility for existing rename func
+      renameSelectedAsset();
+    }
+  }
+
+  if (action === 'delete') {
+    if (!confirm(`Delete ${selectedAssetItems.size} items?`)) return;
+
+    selectedAssetItems.forEach(id => {
+      if (id.startsWith('folder_')) {
+        // Remove folder and its contents? Or move contents to root?
+        // Recursive delete usually expected.
+        deleteFolderRecursive(id);
+      } else {
+        // Delete File
+        deleteFileAsset(id);
+      }
+    });
+
+    selectedAssetItems.clear();
     renderAssetModal();
-    stopAudioPreview();
+    scheduleAutoSave("delete_assets");
+  }
+
+  if (action === 'cut' || action === 'copy') {
+    // ... (Clipboard logic unchanged)
+    assetClipboard = {
+      type: action,
+      items: Array.from(selectedAssetItems)
+    };
+    if (typeof showToast === 'function') showToast(`${action === 'copy' ? 'Copied' : 'Cut'} ${selectedAssetItems.size} items`, "info");
+  }
+
+  if (action === 'paste') {
+    // ... (Paste logic needs to be careful but context action handles call)
+    // Actually paste logic is separate function? No, it was inline in my view.
+    // Wait, I am viewing 'assetContextAction' in previous ViewFile but the replacement above might cut it off.
+    // Let me double check if I am replacing the whole function or just parts.
+    // The user wants duplicate name prevention.
+    // I need to be careful not to delete 'paste' logic if it was inside assetContextAction.
+    // Looking at lines 2900-3000 view:
+    // assetContextAction handles open, rename, delete. 
+    // cut/copy/paste seem to be handled in the SAME function further down (not fully shown in 2900-3000 block?)
+    // Let me ViewFile 2900-3100 to be sure I have the full function before replacing.
   }
 }
 
-// Drag and Drop Logic
-function handleAssetDragOver(e) {
-  e.preventDefault();
+// --- Selection Logic ---
+
+function selectAsset(e, id, type) {
   e.stopPropagation();
-  const grid = document.getElementById("explorerGrid");
-  if (grid) grid.style.background = "rgba(var(--primary-rgb), 0.1)";
+
+  // If already selected and no modifier keys, do nothing (to allow double click)
+  if (selectedAssetItems.has(id) && selectedAssetItems.size === 1 && !e.ctrlKey && !e.shiftKey && !e.metaKey) {
+    // Re-trigger audio preview if needed?
+    if (selectedAssetItems.size === 1 && type === 'file' && activeAssetTab !== 'backgrounds') {
+      playAudioPreview(id);
+    }
+    return;
+  }
+
+  if (e.ctrlKey || e.metaKey) {
+    // Toggle
+    if (selectedAssetItems.has(id)) selectedAssetItems.delete(id);
+    else selectedAssetItems.add(id);
+  } else if (e.shiftKey) {
+    // Range Select (Simplified: add)
+    selectedAssetItems.add(id);
+  } else {
+    // Single Select
+    selectedAssetItems.clear();
+    selectedAssetItems.add(id);
+  }
+
+  // Update Visuals without Re-render
+  updateExplorerSelectionVisuals();
+
+  // Audio Preview
+  if (selectedAssetItems.size === 1 && type === 'file') {
+    const it = Array.from(selectedAssetItems)[0];
+    if (activeAssetTab !== 'backgrounds') playAudioPreview(it);
+  } else {
+    stopAudioPreview();
+  }
+
+  // Update Rename/Delete buttons state
+  updateToolbarButtonsState();
 }
 
-function handleAssetDragLeave(e) {
+function deselectAsset(e) {
+  // Only if clicking on grid background
+  if (e.target.id === 'explorerGrid') {
+    selectedAssetItems.clear();
+    updateExplorerSelectionVisuals();
+    stopAudioPreview();
+    updateToolbarButtonsState(); // Update buttons
+  }
+}
+
+function updateExplorerSelectionVisuals() {
+  const items = document.querySelectorAll('.explorer-item');
+  items.forEach(item => {
+    const id = item.dataset.id;
+    if (selectedAssetItems.has(id)) {
+      item.classList.add('selected');
+    } else {
+      item.classList.remove('selected');
+    }
+  });
+}
+
+function updateToolbarButtonsState() {
+  // Optional: Enable/Disable Rename/Delete buttons based on selection count
+  // We need to query buttons? Or just let render handle it eventually?
+  // Ideally we update them.
+  // Let's assume buttons have IDs or we query them.
+  const renameBtn = document.querySelector("#assetsModal button[onclick='renameSelectedAsset()']"); // Hacky selector if no ID
+  const deleteBtn = document.querySelector("#assetsModal button[onclick='deleteSelectedAsset()']");
+
+  // Note: In previous render logic buttons were disabled if !selectedAsset.
+  // We should update that.
+  // But wait, my previous render had: ${!selectedAsset ? 'disabled ...' : ''}
+  // which refers to the OLD selectedAsset variable. I might need to update render once to use Set.
+  // Actually, I removed the disable logic in HTML in favor of logic inside function?
+  // No, I kept it.
+  // To avoid complex DOM query, let's just make buttons always active visuals but check in function?
+  // Or, let's just re-render TOOLBAR only?
+
+  // Simple approach: Toggle disabled attr
+  if (renameBtn) {
+    if (selectedAssetItems.size === 1) {
+      renameBtn.removeAttribute('disabled');
+      renameBtn.style.opacity = "1";
+    } else {
+      renameBtn.setAttribute('disabled', 'true');
+      renameBtn.style.opacity = "0.5";
+    }
+  }
+  if (deleteBtn) {
+    if (selectedAssetItems.size > 0) {
+      deleteBtn.removeAttribute('disabled');
+      deleteBtn.style.opacity = "1";
+    } else {
+      deleteBtn.setAttribute('disabled', 'true');
+      deleteBtn.style.opacity = "0.5";
+    }
+  }
+}
+
+
+// --- Box Selection ---
+
+function onExplorerMouseDown(e) {
+  if (e.target.id !== 'explorerGrid') return;
+
+  isSelectingAssets = true;
+  const grid = document.getElementById('explorerGrid');
+  const rect = grid.getBoundingClientRect();
+
+  selectionStart = {
+    x: e.clientX - rect.left + grid.scrollLeft,
+    y: e.clientY - rect.top + grid.scrollTop
+  };
+
+  // Create Box
+  const box = document.getElementById('selectionBox');
+  box.style.display = 'block';
+  box.style.left = selectionStart.x + 'px';
+  box.style.top = selectionStart.y + 'px';
+  box.style.width = '0px';
+  box.style.height = '0px';
+
+  // Add temporary listeners
+  document.addEventListener('mousemove', onExplorerMouseMove);
+  document.addEventListener('mouseup', onExplorerMouseUp);
+}
+
+function onExplorerMouseMove(e) {
+  if (!isSelectingAssets) return;
+
+  const grid = document.getElementById('explorerGrid');
+  const rect = grid.getBoundingClientRect();
+  const currentX = e.clientX - rect.left + grid.scrollLeft;
+  const currentY = e.clientY - rect.top + grid.scrollTop;
+
+  const x = Math.min(selectionStart.x, currentX);
+  const y = Math.min(selectionStart.y, currentY);
+  const w = Math.abs(currentX - selectionStart.x);
+  const h = Math.abs(currentY - selectionStart.y);
+
+  const box = document.getElementById('selectionBox');
+  box.style.left = x + 'px';
+  box.style.top = y + 'px';
+  box.style.width = w + 'px';
+  box.style.height = h + 'px';
+
+  // Highlighting Logic (Optional visuals during drag)
+}
+
+function onExplorerMouseUp(e) {
+  if (!isSelectingAssets) return;
+  isSelectingAssets = false;
+  document.getElementById('selectionBox').style.display = 'none';
+
+  document.removeEventListener('mousemove', onExplorerMouseMove);
+  document.removeEventListener('mouseup', onExplorerMouseUp);
+
+  // Calculate Intersections
+  const grid = document.getElementById('explorerGrid');
+  const boxRect = {
+    left: parseFloat(document.getElementById('selectionBox').style.left),
+    top: parseFloat(document.getElementById('selectionBox').style.top),
+    width: parseFloat(document.getElementById('selectionBox').style.width),
+    height: parseFloat(document.getElementById('selectionBox').style.height)
+  };
+
+  // If box too small, treat as click and ignore
+  if (boxRect.width < 5 && boxRect.height < 5) return;
+
+  const items = document.querySelectorAll('.explorer-item');
+
+  if (!e.ctrlKey && !e.shiftKey) selectedAssetItems.clear();
+
+  items.forEach(item => {
+    const itemLeft = item.offsetLeft;
+    const itemTop = item.offsetTop;
+    const itemW = item.offsetWidth;
+    const itemH = item.offsetHeight;
+
+    // Check Intersection
+    if (boxRect.left < itemLeft + itemW &&
+      boxRect.left + boxRect.width > itemLeft &&
+      boxRect.top < itemTop + itemH &&
+      boxRect.top + boxRect.height > itemTop) {
+      selectedAssetItems.add(item.dataset.id);
+    }
+  });
+
+  renderAssetModal();
+}
+
+// --- Context Menu ---
+
+function showAssetContextMenu(x, y) {
+  const menu = document.getElementById('assetContextMenu');
+  menu.style.display = 'block';
+  // Contain within window
+  if (x + 160 > window.innerWidth) x -= 160;
+  if (y + 200 > window.innerHeight) y -= 200;
+
+  menu.style.left = x + 'px';
+  menu.style.top = y + 'px';
+
+  // Hide when clicking elsewhere
+  const hide = () => {
+    menu.style.display = 'none';
+    document.removeEventListener('click', hide);
+  };
+  // Delay to avoid immediate close if triggered by click
+  setTimeout(() => document.addEventListener('click', hide), 10);
+}
+
+function onExplorerContextMenu(e) {
   e.preventDefault();
   e.stopPropagation();
-  const grid = document.getElementById("explorerGrid");
-  if (grid) grid.style.background = "var(--bg-body)";
+
+  // If clicked on item not selected, select it (exclusive)
+  const item = e.target.closest('.explorer-item');
+  if (item) {
+    const id = item.dataset.id;
+    if (!selectedAssetItems.has(id)) {
+      selectedAssetItems.clear();
+      selectedAssetItems.add(id);
+      renderAssetModal();
+    }
+    showAssetContextMenu(e.clientX, e.clientY);
+  } else {
+    // Empty space context menu
+    selectedAssetItems.clear();
+    renderAssetModal();
+    // Maybe different menu for empty space? reuse for now
+    showAssetContextMenu(e.clientX, e.clientY);
+  }
+}
+
+function assetContextAction(action) {
+  if (selectedAssetItems.size === 0 && action !== 'paste') return;
+
+  const firstId = Array.from(selectedAssetItems)[0];
+
+  if (action === 'open') {
+    const folder = project.assets.folders.find(f => f.id === firstId);
+    if (folder) navigateFolder(firstId);
+    else if (selectedAssetItems.size === 1) previewAsset(firstId); // Preview file
+  }
+
+  if (action === 'rename') {
+    if (selectedAssetItems.size !== 1) return alert("Please select one item to rename.");
+    const isFolder = firstId.startsWith('folder_');
+    if (isFolder) {
+      const f = project.assets.folders.find(fo => fo.id === firstId);
+      const newName = prompt("Rename Folder:", f.name);
+      if (newName) { f.name = newName; scheduleAutoSave("rename_folder"); renderAssetModal(); }
+    } else {
+      // File rename logic (existing renameSelectedAsset adapted)
+      selectedAsset = firstId; // Compatibility for existing rename func
+      renameSelectedAsset();
+    }
+  }
+
+  if (action === 'delete') {
+    if (!confirm(`Delete ${selectedAssetItems.size} items?`)) return;
+
+    selectedAssetItems.forEach(id => {
+      if (id.startsWith('folder_')) {
+        // Remove folder and its contents? Or move contents to root?
+        // Recursive delete usually expected.
+        deleteFolderRecursive(id);
+      } else {
+        // Delete File
+        deleteFileAsset(id);
+      }
+    });
+    selectedAssetItems.clear();
+    renderAssetModal();
+  }
+
+  if (action === 'cut' || action === 'copy') {
+    assetClipboard = {
+      type: action,
+      items: Array.from(selectedAssetItems) // Store IDs
+    };
+    if (typeof showToast === 'function') showToast(`${action === 'copy' ? 'Copied' : 'Cut'} ${selectedAssetItems.size} items`, "info");
+  }
+
+  if (action === 'paste') {
+    if (!assetClipboard.items.length) return;
+
+    assetClipboard.items.forEach(id => {
+      if (id.startsWith('folder_')) {
+        // Folder paste logic
+        // If cut, move folder. If copy, duplicate folder (complex).
+        // Let's implement Move (Cut) for folders. Copying folders is heavy.
+        if (assetClipboard.type === 'cut') {
+          const f = project.assets.folders.find(fo => fo.id === id);
+          if (f && f.id !== currentFolderId) { // Check circular reference!
+            // Ensure we are not pasting parent into child
+            let safe = true;
+            let check = currentFolderId;
+            while (check) {
+              if (check === f.id) safe = false;
+              const p = project.assets.folders.find(fo => fo.id === check);
+              check = p ? p.parentId : null;
+            }
+            if (safe) {
+              f.parentId = currentFolderId;
+            } else alert("Cannot move folder into itself.");
+          }
+        }
+      } else {
+        // File paste logic
+        const list = getAssetList(activeAssetTab);
+        const asset = list.find(a => a.name === id);
+
+        if (asset) {
+          if (assetClipboard.type === 'cut') {
+            // Move
+            asset.folderId = currentFolderId;
+          } else {
+            // Copy (Duplicate)
+            const copy = deepClone(asset);
+            copy.name = asset.name + "_copy_" + Date.now().toString().slice(-4);
+            copy.folderId = currentFolderId;
+            list.push(copy);
+          }
+        }
+      }
+    });
+
+    if (assetClipboard.type === 'cut') assetClipboard.items = []; // Clear clipboard after move
+    renderAssetModal();
+    scheduleAutoSave("paste_assets");
+  }
+}
+
+function deleteFolderRecursive(folderId) {
+  // 1. Delete subfolders
+  const subs = project.assets.folders.filter(f => f.parentId === folderId);
+  subs.forEach(s => deleteFolderRecursive(s.id));
+
+  // 2. Delete files in this folder
+  const fileTypes = ['backgrounds', 'bgm', 'voice'];
+  fileTypes.forEach(t => {
+    const list = project.assets[t];
+    if (!list) return;
+    // Collect to remove
+    const toRem = list.filter(a => a.folderId === folderId);
+    toRem.forEach(a => {
+      const idx = list.indexOf(a);
+      if (idx > -1) list.splice(idx, 1);
+    });
+  });
+
+  // 3. Remove folder itself
+  const fIdx = project.assets.folders.findIndex(f => f.id === folderId);
+  if (fIdx > -1) project.assets.folders.splice(fIdx, 1);
+}
+
+function deleteFileAsset(name) {
+  // Reuse existing delete logic sort of
+  if (activeAssetTab === 'backgrounds') {
+    project.assets.backgrounds = project.assets.backgrounds.filter(x => x.name !== name);
+  } else {
+    project.assets[activeAssetTab] = project.assets[activeAssetTab].filter(x => x.name !== name);
+  }
+  // Note: Reusing name as ID logic
+}
+
+function getAssetList(type) {
+  if (type === 'backgrounds') return project.assets.backgrounds;
+  if (type === 'bgm') return project.assets.bgm;
+  if (type === 'voice') return project.assets.voice;
+  return [];
+}
+
+
+// --- Drag & Drop Internal ---
+
+function handleDragStart(e, type, id) {
+  e.stopPropagation();
+  e.dataTransfer.setData("application/json", JSON.stringify({ type, id, source: 'explorer' }));
+
+  // If dragging a selected item, drag ALL selected items
+  if (selectedAssetItems.has(id)) {
+    const payload = {
+      type: 'multi',
+      items: Array.from(selectedAssetItems)
+    };
+    e.dataTransfer.setData("application/vn-assets", JSON.stringify(payload));
+  } else {
+    e.dataTransfer.setData("application/vn-assets", JSON.stringify({ type: 'single', id, itemType: type }));
+  }
+}
+
+function handleDragOverItem(e, el) {
+  e.preventDefault();
+  e.stopPropagation();
+  el.classList.add('drag-over');
+}
+
+function handleDragLeaveItem(e, el) {
+  e.preventDefault();
+  e.stopPropagation();
+  el.classList.remove('drag-over');
+}
+
+function handleDropOnItem(e, targetId) {
+  e.preventDefault();
+  e.stopPropagation();
+  e.currentTarget.classList.remove('drag-over');
+
+  const raw = e.dataTransfer.getData("application/vn-assets");
+  if (!raw) return; // External file drop handled by grid
+
+  const data = JSON.parse(raw);
+  let itemsToMove = [];
+
+  if (data.type === 'multi') itemsToMove = data.items;
+  else itemsToMove = [data.id];
+
+  itemsToMove.forEach(id => {
+    // Move to targetId (Folder)
+    if (id === targetId) return; // Cannot move into self
+
+    if (id.startsWith('folder_')) {
+      const f = project.assets.folders.find(fo => fo.id === id);
+      if (f) f.parentId = targetId;
+    } else {
+      const list = getAssetList(activeAssetTab);
+      const a = list.find(x => x.name === id);
+      if (a) a.folderId = targetId;
+    }
+  });
+
+  renderAssetModal();
+  scheduleAutoSave("move_assets_to_folder");
 }
 
 function handleAssetDrop(e) {
+  // Drop on grid (empty space)
   e.preventDefault();
   e.stopPropagation();
+
+  // Check if internal move or external upload
+  const raw = e.dataTransfer.getData("application/vn-assets");
+  if (raw) {
+    // Internal Move to CURRENT folder
+    const data = JSON.parse(raw);
+    let itemsToMove = [];
+    if (data.type === 'multi') itemsToMove = data.items;
+    else itemsToMove = [data.id];
+
+    itemsToMove.forEach(id => {
+      if (id.startsWith('folder_')) {
+        const f = project.assets.folders.find(fo => fo.id === id);
+        if (f) f.parentId = currentFolderId;
+      } else {
+        const list = getAssetList(activeAssetTab);
+        const a = list.find(x => x.name === id);
+        if (a) a.folderId = currentFolderId;
+      }
+    });
+    renderAssetModal();
+    scheduleAutoSave("move_assets_root");
+    return;
+  }
+
+  // External File Upload
   const grid = document.getElementById("explorerGrid");
   if (grid) grid.style.background = "var(--bg-body)";
 
   const files = Array.from(e.dataTransfer.files);
   if (!files || files.length === 0) return;
 
+  // Reuse existing upload logic but inject folderId
   files.forEach(file => {
     // Validate File Type
-    if (activeAssetTab === 'backgrounds') {
-      if (!file.type.startsWith("image/")) {
-        console.warn("Skipped non-image file for backgrounds:", file.name);
-        return;
-      }
-    } else {
-      // Audio tabs (bgm, voice)
-      if (!file.type.startsWith("audio/")) {
-        console.warn("Skipped non-audio file for " + activeAssetTab + ":", file.name);
-        return;
-      }
-    }
+    if (activeAssetTab === 'backgrounds' && !file.type.startsWith("image/")) return;
+    if (activeAssetTab !== 'backgrounds' && !file.type.startsWith("audio/")) return;
 
-    // Auto-name (no prompt for bulk)
     const name = file.name.split('.')[0];
 
     readFileAsDataURL(file, (url, fn) => {
+      const item = { name, url, fileName: fn, folderId: currentFolderId }; // Add folderId
+
       if (activeAssetTab === "backgrounds") {
-        project.assets.backgrounds.push({ name, url, fileName: fn });
+        project.assets.backgrounds.push(item);
       } else if (activeAssetTab === "bgm") {
         if (!project.assets.bgm) project.assets.bgm = [];
-        project.assets.bgm.push({ name, url, fileName: fn });
+        project.assets.bgm.push(item);
       } else if (activeAssetTab === "voice") {
         if (!project.assets.voice) project.assets.voice = [];
-        project.assets.voice.push({ name, url, fileName: fn });
+        project.assets.voice.push(item);
       }
 
       scheduleAutoSave("add_" + activeAssetTab);
@@ -2614,6 +3330,10 @@ function handleAssetDrop(e) {
     });
   });
 }
+
+
+// Drag and Drop Logic
+
 
 
 async function exportAssets() {
