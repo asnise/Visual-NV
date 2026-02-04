@@ -3293,6 +3293,20 @@ function handleDropOnItem(e, targetId) {
   scheduleAutoSave("move_assets_to_folder");
 }
 
+function handleAssetDragOver(e) {
+  e.preventDefault();
+  e.stopPropagation();
+  const grid = document.getElementById("explorerGrid");
+  if (grid) grid.style.background = "var(--bg-secondary)";
+}
+
+function handleAssetDragLeave(e) {
+  e.preventDefault();
+  e.stopPropagation();
+  const grid = document.getElementById("explorerGrid");
+  if (grid) grid.style.background = "var(--bg-body)";
+}
+
 function handleAssetDrop(e) {
   // Drop on grid (empty space)
   e.preventDefault();
