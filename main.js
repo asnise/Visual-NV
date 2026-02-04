@@ -127,7 +127,9 @@ async function restoreProjectData() {
 
     // Ensure Assets Exist
     if (!project.assets.bgm) project.assets.bgm = [];
+    if (!project.assets.bgm) project.assets.bgm = [];
     if (!project.assets.voice) project.assets.voice = [];
+    if (!project.assets.folders) project.assets.folders = []; // Ensure folders exist
 
     const ui = payload.data.ui || {};
     if (typeof ui.activeChapterId === "number")
@@ -2701,6 +2703,9 @@ function createNewFolder() {
   const name = prompt("Enter Folder Name:", "New Folder");
   if (!name) return;
 
+  // Ensure folders array exists
+  if (!project.assets.folders) project.assets.folders = [];
+
   // Check for duplicate folder name in current directory
   const exists = project.assets.folders.some(f =>
     f.parentId === currentFolderId &&
@@ -3071,6 +3076,7 @@ function assetContextAction(action) {
   const firstId = Array.from(selectedAssetItems)[0];
 
   if (action === 'open') {
+    if (!project.assets.folders) project.assets.folders = [];
     const folder = project.assets.folders.find(f => f.id === firstId);
     if (folder) navigateFolder(firstId);
     else if (selectedAssetItems.size === 1) previewAsset(firstId); // Preview file
@@ -3080,9 +3086,28 @@ function assetContextAction(action) {
     if (selectedAssetItems.size !== 1) return alert("Please select one item to rename.");
     const isFolder = firstId.startsWith('folder_');
     if (isFolder) {
+      if (!project.assets.folders) project.assets.folders = [];
       const f = project.assets.folders.find(fo => fo.id === firstId);
       const newName = prompt("Rename Folder:", f.name);
-      if (newName) { f.name = newName; scheduleAutoSave("rename_folder"); renderAssetModal(); }
+
+      if (newName && newName !== f.name) {
+        // Check collision
+        const exists = project.assets.folders.some(fo =>
+          fo.id !== f.id && // Not self
+          fo.parentId === f.parentId && // Same parent
+          fo.name.toLowerCase() === newName.toLowerCase() &&
+          (!fo.type || fo.type === activeAssetTab)
+        );
+
+        if (exists) {
+          alert(`Folder named "${newName}" already exists!`);
+          return;
+        }
+
+        f.name = newName;
+        scheduleAutoSave("rename_folder");
+        renderAssetModal();
+      }
     } else {
       // File rename logic (existing renameSelectedAsset adapted)
       selectedAsset = firstId; // Compatibility for existing rename func
