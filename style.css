@@ -2326,3 +2326,107 @@ input:checked+.slider:before {
 #assetContextMenu {
     /* inherits .context-menu */
 }
+
+/* === Voice Over Custom Dropdown === */
+.vo-dropdown {
+    width: 100%;
+}
+
+.vo-dropdown-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 6px 10px;
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    background: var(--bg-panel);
+    cursor: pointer;
+    font-size: 11px;
+    color: var(--text-main);
+    transition: border-color 0.2s;
+    user-select: none;
+}
+
+.vo-dropdown-header:hover {
+    border-color: var(--primary);
+}
+
+.vo-dropdown-header span {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    flex: 1;
+    min-width: 0;
+}
+
+.vo-dropdown-panel {
+    position: absolute;
+    bottom: 100%;
+    left: 0;
+    right: 0;
+    z-index: 100;
+    background: var(--bg-panel);
+    border: 1px solid var(--border);
+    border-radius: 6px 6px 0 0;
+    box-shadow: var(--shadow-lg);
+    max-height: 220px;
+    overflow-y: auto;
+    scrollbar-width: thin;
+}
+
+.vo-item {
+    padding: 5px 12px;
+    font-size: 11px;
+    cursor: pointer;
+    color: var(--text-main);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    transition: background 0.1s;
+}
+
+.vo-item:hover {
+    background: var(--hover-bg);
+}
+
+.vo-item.vo-active {
+    background: var(--selected-bg);
+    font-weight: 600;
+}
+
+.vo-folder-header {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 5px 8px;
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--text-muted);
+    cursor: pointer;
+    user-select: none;
+    border-top: 1px solid var(--border-light);
+    transition: background 0.1s;
+}
+
+.vo-folder-header:hover {
+    background: var(--hover-bg);
+    color: var(--text-main);
+}
+
+.vo-folder-arrow {
+    font-size: 8px;
+    width: 12px;
+    text-align: center;
+    flex-shrink: 0;
+}
+
+.vo-folder-count {
+    margin-left: auto;
+    font-size: 10px;
+    color: var(--text-subtle);
+    font-weight: 400;
+}
+
+.vo-folder-items .vo-item {
+    padding-left: 26px;
+}

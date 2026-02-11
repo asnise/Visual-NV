@@ -1473,18 +1473,20 @@ function renderInspector() {
             <div style="display:flex; flex-direction:column; gap:5px;">
                 <input type="text" placeholder="Search Voice..." class="inspector-input" 
                        style="padding:4px; font-size:11px;" 
+                       id="voiceSearchInput"
                        oninput="filterVoiceDropdown(this.value)">
                 
-                <div style="display:flex; gap:5px; align-items:center;">
-                    <select id="voiceOverSelect" onchange="updateVoiceOver(this.value)" style="flex:1; font-size:11px;">
-                        <option value="">(None)</option>
-                        ${(project.assets.voice || []).map(a => {
-          const voMap = (typeof frame.voiceOver === 'object' && frame.voiceOver) ? frame.voiceOver : (typeof frame.voiceOver === 'string' ? { [editorLanguage]: frame.voiceOver } : {});
-          const currentVo = voMap[editorLanguage];
-          const selected = currentVo === a.name ? "selected" : "";
-          return `<option value="${a.name}" ${selected}>${a.name}</option>`;
-        }).join("")}
-                    </select>
+                <div id="voiceDropdownContainer" class="vo-dropdown" style="position:relative;">
+                    <div class="vo-dropdown-header" onclick="toggleVoiceDropdown()">
+                        <span id="voiceDropdownLabel">${(() => {
+        const voMap = (typeof frame.voiceOver === 'object' && frame.voiceOver) ? frame.voiceOver : (typeof frame.voiceOver === 'string' ? { [editorLanguage]: frame.voiceOver } : {});
+        return voMap[editorLanguage] || '(None)';
+      })()}</span>
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m6 9 6 6 6-6"/></svg>
+                    </div>
+                    <div id="voiceDropdownPanel" class="vo-dropdown-panel" style="display:none;">
+                        ${buildVoiceDropdownHTML(frame)}
+                    </div>
                 </div>
             </div>
             <input type="file" id="voFileInput" style="display:none;" accept="audio/*" onchange="handleVoUpload(this)">
@@ -1575,28 +1577,104 @@ function updateVoiceOver(val) {
   scheduleAutoSave("update_voice_over");
 }
 
-function filterVoiceDropdown(query) {
-  const select = document.getElementById("voiceOverSelect");
-  if (!select) return;
+let voiceFolderCollapsed = {};
+let voiceDropdownOpen = false;
 
-  const term = query.toLowerCase();
-  const frame = getFrame();
+function buildVoiceDropdownHTML(frame, filterTerm) {
+  const allVoice = project.assets.voice || [];
+  const voMap = (typeof frame.voiceOver === 'object' && frame.voiceOver) ? frame.voiceOver : (typeof frame.voiceOver === 'string' ? { [editorLanguage]: frame.voiceOver } : {});
+  const currentVo = voMap[editorLanguage];
+  const term = (filterTerm || '').toLowerCase();
+  const voiceFolders = (project.assets.folders || []).filter(f => f.type === 'voice');
+  const matchFilter = (a) => !term || a.name.toLowerCase().includes(term) || currentVo === a.name;
 
-  // Helper to check if option should be selected
-  const isSelected = (val) => {
-    const voMap = (typeof frame.voiceOver === 'object' && frame.voiceOver) ? frame.voiceOver : (typeof frame.voiceOver === 'string' ? { [editorLanguage]: frame.voiceOver } : {});
-    return voMap[editorLanguage] === val;
+  const buildItem = (a) => {
+    const isActive = currentVo === a.name ? ' vo-active' : '';
+    return `<div class="vo-item${isActive}" onclick="selectVoiceItem('${a.name.replace(/'/g, "\\'")}')"
+                 title="${a.name}">${a.name}</div>`;
   };
 
-  const optionsHTML = `<option value="">(None)</option>` +
-    (project.assets.voice || [])
-      .filter(a => a.name.toLowerCase().includes(term) || isSelected(a.name)) // Keep selected even if not match
-      .map(a => {
-        const selected = isSelected(a.name) ? "selected" : "";
-        return `<option value="${a.name}" ${selected}>${a.name}</option>`;
-      }).join("");
+  let html = `<div class="vo-item${!currentVo ? ' vo-active' : ''}" onclick="selectVoiceItem('')">(None)</div>`;
 
-  select.innerHTML = optionsHTML;
+  // Root items
+  const rootItems = allVoice.filter(a => !a.folderId && matchFilter(a));
+  rootItems.forEach(a => { html += buildItem(a); });
+
+  // Grouped by folder
+  voiceFolders.forEach(folder => {
+    const items = allVoice.filter(a => a.folderId === folder.id && matchFilter(a));
+    if (items.length === 0) return;
+    const collapsed = !!voiceFolderCollapsed[folder.id] && !term;
+    const arrow = collapsed ? '▶' : '▼';
+    html += `<div class="vo-folder-header" onclick="event.stopPropagation(); toggleVoiceFolder('${folder.id}')">
+               <span class="vo-folder-arrow">${arrow}</span>
+               <span>${folder.name}</span>
+               <span class="vo-folder-count">${items.length}</span>
+             </div>`;
+    html += `<div class="vo-folder-items" style="${collapsed ? 'display:none;' : ''}">`;
+    items.forEach(a => { html += buildItem(a); });
+    html += `</div>`;
+  });
+
+  return html;
+}
+
+function toggleVoiceDropdown() {
+  const panel = document.getElementById('voiceDropdownPanel');
+  if (!panel) return;
+  voiceDropdownOpen = !voiceDropdownOpen;
+  panel.style.display = voiceDropdownOpen ? 'block' : 'none';
+  if (voiceDropdownOpen) {
+    // Close when clicking outside
+    setTimeout(() => {
+      document.addEventListener('click', closeVoiceDropdownOutside, { once: true });
+    }, 0);
+  }
+}
+
+function closeVoiceDropdownOutside(e) {
+  const container = document.getElementById('voiceDropdownContainer');
+  if (container && !container.contains(e.target)) {
+    const panel = document.getElementById('voiceDropdownPanel');
+    if (panel) panel.style.display = 'none';
+    voiceDropdownOpen = false;
+  } else if (voiceDropdownOpen) {
+    setTimeout(() => {
+      document.addEventListener('click', closeVoiceDropdownOutside, { once: true });
+    }, 0);
+  }
+}
+
+function selectVoiceItem(val) {
+  updateVoiceOver(val);
+  const label = document.getElementById('voiceDropdownLabel');
+  if (label) label.textContent = val || '(None)';
+  const panel = document.getElementById('voiceDropdownPanel');
+  if (panel) panel.style.display = 'none';
+  voiceDropdownOpen = false;
+  // Re-render to update active state
+  const frame = getFrame();
+  const searchInput = document.getElementById('voiceSearchInput');
+  const term = searchInput ? searchInput.value : '';
+  if (panel) panel.innerHTML = buildVoiceDropdownHTML(frame, term);
+}
+
+function toggleVoiceFolder(folderId) {
+  voiceFolderCollapsed[folderId] = !voiceFolderCollapsed[folderId];
+  const frame = getFrame();
+  const searchInput = document.getElementById('voiceSearchInput');
+  const term = searchInput ? searchInput.value : '';
+  const panel = document.getElementById('voiceDropdownPanel');
+  if (panel) panel.innerHTML = buildVoiceDropdownHTML(frame, term);
+}
+
+function filterVoiceDropdown(query) {
+  const panel = document.getElementById('voiceDropdownPanel');
+  if (!panel) return;
+  const frame = getFrame();
+  panel.innerHTML = buildVoiceDropdownHTML(frame, query);
+  panel.style.display = 'block';
+  voiceDropdownOpen = true;
 }
 
 function triggerVoUpload() {
